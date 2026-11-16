@@ -128,7 +128,7 @@ export function upsertNote(n: Note) {
 }
 
 export function deleteNote(id: string) {
-  setState((s) => ({ ...s, notes: s.notes.filter((n) => n.id !== id) }));
+  setState((s) => ({ ...s, notes: s.notes.filter((n) => n.id !== id), chat: s.chat.filter((m) => m.noteId !== id) }));
 }
 
 // ---------- Actions : dossiers ----------
@@ -173,8 +173,9 @@ export function patchChat(id: string, patch: Partial<ChatMsg>) {
   setState((s) => ({ ...s, chat: s.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)) }));
 }
 
-export function clearChat() {
-  setState((s) => ({ ...s, chat: [] }));
+/** Efface une conversation : la générale (sans argument) ou celle d'une note. */
+export function clearChat(noteId?: string) {
+  setState((s) => ({ ...s, chat: s.chat.filter((m) => m.noteId !== noteId) }));
 }
 
 // ---------- Réglages ----------

@@ -1,5 +1,5 @@
 import { AppData, ChatMsg, Source } from '../types';
-import { buildContext, REFORMAT_PROMPT, systemPrompt } from './context';
+import { buildContext, findNoteByTitle, REFORMAT_PROMPT, systemPrompt } from './context';
 import { deviceBackend } from './device';
 import { ollamaBackend } from './ollama';
 import { isNativeAndroid, nativeBackend } from './native';
@@ -13,11 +13,11 @@ export function backendFor(data: AppData): LlmBackend {
   return ollamaBackend(data.settings);
 }
 
-const TOOL_RE = /\[\[\s*(search|fetch)\s*:\s*([^\]]+?)\s*\]\]/i;
+const TOOL_RE = /\[\[\s*(search|fetch|note)\s*:\s*([^\]]+?)\s*\]\]/i;
 
-export function parseTool(text: string): { kind: 'search' | 'fetch'; arg: string } | null {
+export function parseTool(text: string): { kind: 'search' | 'fetch' | 'note'; arg: string } | null {
   const m = text.match(TOOL_RE);
-  return m ? { kind: m[1].toLowerCase() as 'search' | 'fetch', arg: m[2].trim() } : null;
+  return m ? { kind: m[1].toLowerCase() as 'search' | 'fetch' | 'note', arg: m[2].trim() } : null;
 }
 
 /** Texte affichable pendant le streaming : on cache les commandes [[...]]. */
@@ -54,7 +54,8 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
   o.onStatus('data', `${o.data.habits.length} habitudes · ${o.data.notes.length} notes`);
   const ctx = buildContext(o.data, o.text, backend.contextBudget, o.focusNoteId);
 
-  const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(ctx.text, web) }];
+  const messages: LlmMessage[] = [{ role: 'system', content: systemPrompt(ctx.text, web, ctx.focusTitle) }];
+  const used = [...ctx.used];
   for (const m of o.history.filter((m) => !m.error && m.text).slice(-8)) {
     messages.push({ role: m.role, content: m.text });
   }
@@ -90,12 +91,24 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
     const tool = parseTool(out);
     if (!tool || step === 3) {
       const final = out.replace(TOOL_RE, '').trim();
-      return { text: final, sources, used: ctx.used };
+      return { text: final, sources, used };
     }
 
     messages.push({ role: 'assistant', content: out.trim() });
     // L'image n'est envoyée qu'une fois.
     messages.forEach((m) => delete m.image);
+
+    if (tool.kind === 'note') {
+      const n = findNoteByTitle(o.data, tool.arg);
+      o.onStatus('data', `lit « ${(n?.title || tool.arg).slice(0, 30)} »`);
+      if (n) {
+        if (!used.includes('+NOTE LUE')) used.push('+NOTE LUE');
+        messages.push({ role: 'user', content: `Contenu de la note « ${n.title || 'Sans titre'} » :\n\n${n.body.slice(0, 4000) || '(vide)'}\n\nRéponds maintenant à ma question.` });
+      } else {
+        messages.push({ role: 'user', content: `Aucune note ne s'appelle « ${tool.arg} ». Réponds avec ce que tu as.` });
+      }
+      continue;
+    }
 
     if (!web) {
       messages.push({ role: 'user', content: "La recherche web est désactivée. Réponds avec ce que tu sais, en précisant que tu n'as pas pu vérifier en ligne." });
@@ -120,7 +133,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       messages.push({ role: 'user', content: `La recherche web a échoué (${e?.message || 'erreur'}). Réponds avec ce que tu sais, en le précisant.` });
     }
   }
-  return { text: '', sources, used: ctx.used };
+  return { text: '', sources, used };
 }
 
 export function cleanReformat(text: string): string {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import { BottomNav } from '../components/BottomNav';
 import { Icon } from '../components/Icon';
@@ -45,7 +45,8 @@ function Bubble({ m }: { m: ChatMsg }) {
 
 export function Chat({ noteId, prefill }: { noteId?: string; prefill?: string }) {
   const nav = useNav();
-  const chat = useStore((s) => s.chat);
+  const allChat = useStore((s) => s.chat);
+  const chat = useMemo(() => allChat.filter((m) => m.noteId === noteId), [allChat, noteId]);
   const data = useStore((s) => s);
   const note = useStore((s) => (noteId ? s.notes.find((n) => n.id === noteId) : undefined));
   const session = useSession();
@@ -92,14 +93,15 @@ export function Chat({ noteId, prefill }: { noteId?: string; prefill?: string })
     }
   };
 
-  const showPill = session.busy || session.status === 'listen';
+  const mine = session.noteId === noteId;
+  const showPill = (session.busy && mine) || session.status === 'listen';
 
   return (
     <div className="screen">
       <header className="row" style={{ padding: 'calc(var(--top) + 10px) 16px 12px', borderBottom: '1px solid #1c1c20', gap: 12 }}>
         <button className="icon-btn" aria-label="Retour" onClick={nav.back}><Icon name="back" size={18} /></button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 0 }}>
-          <span style={{ fontSize: 17, fontWeight: 600 }}>Assistant</span>
+          <span style={{ fontSize: 17, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{note ? note.title || 'Sans titre' : 'Assistant'}</span>
           <span className="row" style={{ gap: 6 }}>
             <span className="tag">{label}</span>
             <button className={`tag ${data.settings.webEnabled ? 'accent' : ''}`} onClick={() => updateSettings({ webEnabled: !data.settings.webEnabled })} aria-pressed={data.settings.webEnabled}>
@@ -107,20 +109,31 @@ export function Chat({ noteId, prefill }: { noteId?: string; prefill?: string })
             </button>
           </span>
         </div>
-        <button className="icon-btn" aria-label="Nouvelle conversation" disabled={session.busy || !chat.length} onClick={clearChat}><Icon name="trash" size={18} /></button>
+        {note && <button className="icon-btn" aria-label="Ouvrir la note" onClick={() => nav.go({ name: 'note', id: note.id })}><Icon name="note" size={18} /></button>}
+        <button className="icon-btn" aria-label="Effacer cette conversation" disabled={session.busy || !chat.length} onClick={() => clearChat(noteId)}><Icon name="trash" size={18} /></button>
       </header>
 
       <div ref={listRef} className="scroll" style={{ flex: 1, padding: '18px 16px 190px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         {chat.length === 0 && !session.busy && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 20 }}>
-            <span className="label">Exemples</span>
-            {['Fais-moi le bilan de ma semaine', 'Résume mes notes récentes', 'Quelles sont les actus tech du jour ?'].map((q) => (
+            {note && (
+              <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 6, borderColor: 'color-mix(in srgb, var(--a) 40%, var(--line))' }}>
+                <span className="label" style={{ color: 'var(--a-soft)' }}>Contexte principal</span>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{note.title || 'Sans titre'}</span>
+                <span style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.45 }}>L’IA répond d’abord à partir de cette note, et ne va voir tes autres notes, habitudes ou le web que si c’est utile.</span>
+              </div>
+            )}
+            <span className="label" style={{ marginTop: note ? 6 : 0 }}>Exemples</span>
+            {(note
+              ? ['Résume cette note', 'Quelles actions je dois en tirer ?', 'Fais des liens avec mes autres notes']
+              : ['Fais-moi le bilan de ma semaine', 'Résume mes notes récentes', 'Quelles sont les actus tech du jour ?']
+            ).map((q) => (
               <button key={q} className="card link" style={{ fontSize: 15 }} onClick={() => setText(q)}>{q}</button>
             ))}
           </div>
         )}
         {chat.map((m) => <Bubble key={m.id} m={m} />)}
-        {session.busy && session.draft && (
+        {session.busy && mine && session.draft && (
           <div className="md" style={{ maxWidth: '94%' }}><Markdown>{session.draft}</Markdown><span className="caret" aria-hidden="true" /></div>
         )}
         {showPill && <StatusPill status={session.status} sub={session.sub} />}
@@ -129,7 +142,7 @@ export function Chat({ noteId, prefill }: { noteId?: string; prefill?: string })
       <div style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(var(--bottom) + 72px)', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(note || image || dictErr) && (
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {note && <span className="tag accent">NOTE · {(note.title || 'Sans titre').toUpperCase().slice(0, 28)}</span>}
+            {note && <span className="tag accent">CONTEXTE · {(note.title || 'Sans titre').toUpperCase().slice(0, 28)}</span>}
             {image && (
               <span className="row" style={{ gap: 6 }}>
                 <img src={image} alt="Image jointe" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--line)' }} />

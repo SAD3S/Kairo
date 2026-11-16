@@ -47,6 +47,8 @@ export interface ChatMsg {
   /** Données de l'app consultées pour répondre (affichées en puces). */
   used?: string[];
   error?: boolean;
+  /** Conversation rattachée à une note (absent = conversation générale). */
+  noteId?: string;
   at: number;
 }
 

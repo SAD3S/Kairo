@@ -9,6 +9,8 @@ interface SessionState {
   status: AiStatus;
   sub?: string;
   draft: string;
+  /** Conversation concernée par la génération en cours. */
+  noteId?: string;
 }
 
 let st: SessionState = { busy: false, status: 'idle', draft: '' };
@@ -42,10 +44,11 @@ export function errorText(e: any): string {
 export async function sendChat(text: string, image?: string, focusNoteId?: string) {
   if (st.busy) return;
   const data = getState();
-  const history = data.chat;
-  pushChat({ id: uid(), role: 'user', text, image, at: Date.now() });
+  // Chaque note a sa propre conversation ; la générale n'a pas de noteId.
+  const history = data.chat.filter((m) => m.noteId === focusNoteId);
+  pushChat({ id: uid(), role: 'user', text, image, noteId: focusNoteId, at: Date.now() });
   controller = new AbortController();
-  set({ busy: true, status: 'think', sub: undefined, draft: '' });
+  set({ busy: true, status: 'think', sub: undefined, draft: '', noteId: focusNoteId });
   const id = uid();
   try {
     const r = await runAgent({
@@ -58,12 +61,12 @@ export async function sendChat(text: string, image?: string, focusNoteId?: strin
       onStatus: (status, sub) => set({ status, sub }),
       onText: (draft) => set({ draft }),
     });
-    pushChat({ id, role: 'assistant', text: r.text || '…', sources: r.sources, used: r.used, at: Date.now() });
+    pushChat({ id, role: 'assistant', text: r.text || '…', sources: r.sources, used: r.used, noteId: focusNoteId, at: Date.now() });
   } catch (e: any) {
     if (e?.name === 'AbortError') {
-      if (st.draft) pushChat({ id, role: 'assistant', text: st.draft + ' …', at: Date.now() });
+      if (st.draft) pushChat({ id, role: 'assistant', text: st.draft + ' …', noteId: focusNoteId, at: Date.now() });
     } else {
-      pushChat({ id, role: 'assistant', text: errorText(e), error: true, at: Date.now() });
+      pushChat({ id, role: 'assistant', text: errorText(e), error: true, noteId: focusNoteId, at: Date.now() });
     }
   } finally {
     controller = null;

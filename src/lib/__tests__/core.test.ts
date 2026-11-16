@@ -197,3 +197,39 @@ describe('dossiers', () => {
     expect(sanitize({ notes: [] }).folders).toEqual([]);
   });
 });
+
+describe('conversation depuis une note', () => {
+  const data = () => {
+    const d = emptyData();
+    d.folders = [{ id: 'f', name: 'Films', createdAt: 0 }];
+    d.notes = [
+      { id: 'a', title: 'Dune 2', body: 'Revoir en IMAX. Villeneuve.', tags: [], pinned: false, folderId: 'f', createdAt: 0, updatedAt: 0 },
+      { id: 'b', title: 'Liste de courses', body: 'lait, pain', tags: [], pinned: false, createdAt: 0, updatedAt: 0 },
+      { id: 'c', title: 'Villeneuve filmographie', body: 'Arrival, Sicario, Blade Runner 2049', tags: [], pinned: false, createdAt: 0, updatedAt: 0 },
+    ];
+    d.habits = [mk([0])];
+    return d;
+  };
+  it('la note ouverte passe en premier, avant les habitudes', () => {
+    const c = buildContext(data(), 'résume', 3500, 'a');
+    expect(c.focusTitle).toBe('Dune 2');
+    const i = c.text.indexOf('NOTE OUVERTE');
+    expect(i).toBeGreaterThan(0);
+    expect(i).toBeLessThan(c.text.indexOf('HABITUDES'));
+    expect(c.text).toContain('dossier : Films');
+    expect(c.text).toContain('Villeneuve filmographie'); // note liée trouvée via le titre de la note ouverte
+    expect(c.used[0]).toBe('NOTE OUVERTE');
+  });
+  it('l’IA peut lire une autre note avec [[note: …]]', async () => {
+    const replies = ['[[note: courses]]', 'Il te faut du lait et du pain.'];
+    const calls: any[] = [];
+    const be: LlmBackend = { label: 'F', contextBudget: 3500, async chat(m, o) { calls.push(m); const r = replies.shift()!; o.onDelta(r, 'content'); return r; } };
+    const statuses: string[] = [];
+    const r = await runAgent({ data: data(), history: [], text: 'et pour les courses ?', focusNoteId: 'a', backend: be, onStatus: (s, sub) => statuses.push(`${s}:${sub ?? ''}`), onText: () => {} });
+    expect(r.text).toBe('Il te faut du lait et du pain.');
+    expect(calls[0][0].content).toContain('CONTEXTE PRINCIPAL');
+    expect(calls[1].at(-1).content).toContain('lait, pain');
+    expect(statuses).toContain('data:lit « Liste de courses »');
+    expect(r.used).toContain('+NOTE LUE');
+  });
+});
