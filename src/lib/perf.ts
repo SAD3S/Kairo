@@ -5,10 +5,6 @@ export interface PerfEntry { ms: number; at: number; note?: string }
 export const PERF_LABELS: Record<string, string> = {
   'app.start': 'Démarrage : premier écran affiché',
   'map.ready': 'Carte utilisable',
-  'graph.download': 'Routes : téléchargement (Overpass)',
-  'graph.build': 'Routes : construction du graphe',
-  'graph.pack': 'Routes : chargement du pack hors ligne',
-  'route.compute': 'Itinéraire : calcul (sans l’animation)',
   'ai.firstToken': 'IA : premier mot affiché',
   'ai.total': 'IA : réponse complète',
 };

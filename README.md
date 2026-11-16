@@ -93,23 +93,15 @@ Sans Mac, hors ligne : Réglages → « Sur le téléphone » → **Télécharge
 le téléchargement reprend où il s'était arrêté. En Wi-Fi, il continue même app fermée.
 Puis « Charger maintenant » (10–20 s la première fois).
 
-## Itinéraire (onglet carte)
+## Carte
 
-Calcul d'itinéraire en voiture avec **visualisation de Dijkstra ou A\*** puis guidage GPS vocal.
-100 % gratuit, sans clé : carte OpenFreeMap (MapLibre), adresses Photon, routes Overpass (OpenStreetMap).
+Carte (OpenFreeMap, MapLibre), recherche de lieux (Photon) et ta position GPS.
 
-- Tape le départ et l'arrivée (suggestions pendant la frappe), ou « Ma position », ou appui long sur la carte.
-- Choisis l'algorithme et la durée de l'animation, puis « Calculer l'itinéraire » (« Passer l'animation » pour aller au résultat).
-- « Démarrer » : la carte suit ta position, annonces vocales à 500 / 200 / 50 m, recalcul automatique si tu sors de la route.
-- Jusqu'à 50 km à vol d'oiseau : toutes les rues autour du départ et de l'arrivée, grands axes entre les deux.
-- Sans pack : nécessite Internet (carte, adresses, routes).
-
-### Pack hors ligne Île-de-France
-
-Réglages → **Cartes hors ligne** → Télécharger. Ensuite, dans toute l'Île-de-France (Paris + 7 départements) :
-itinéraires instantanés sans Overpass, carte sombre et recherche (communes, gares, lieux connus, rues) **sans réseau**.
-Le pack est fabriqué chaque mois par GitHub Actions (`.github/workflows/pack.yml`, données © OpenStreetMap,
-carte Protomaps) et publié dans la release `pack-idf`.
+- « Ma position » : la carte suit ta position et s'oriente dans ton sens de déplacement.
+  Si tu déplaces la carte, un bouton **Recentrer** apparaît.
+- **Pack hors ligne Île-de-France** (Réglages → Cartes hors ligne) : carte sombre et recherche
+  de lieux sans réseau. Fabriqué chaque mois par GitHub Actions (`.github/workflows/pack.yml`,
+  données © OpenStreetMap, carte Protomaps), release `pack-idf`.
 
 ## Les états de l’IA (loaders)
 

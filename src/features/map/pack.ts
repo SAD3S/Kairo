@@ -1,6 +1,5 @@
-// Pack hors ligne d'une région : graphe routier binaire, index d'adresses, tuiles de carte.
-// Ce module est pur (décodage, recherche) ; le téléchargement natif est dans packStore.ts.
-import { Graph } from './graph';
+// Pack hors ligne d'une région : index d'adresses et tuiles de carte.
+// Ce module est pur (recherche) ; le téléchargement natif est dans packStore.ts.
 import { haversine, LatLon } from './geo';
 import { Place } from './repo';
 
@@ -12,31 +11,6 @@ export const PACK_BBOX: [number, number, number, number] = [1.44, 48.12, 3.56, 4
 
 export function insidePack(p: LatLon, bbox = PACK_BBOX) {
   return p.lon >= bbox[0] && p.lon <= bbox[2] && p.lat >= bbox[1] && p.lat <= bbox[3];
-}
-
-/**
- * Format binaire « KGR1 » (petit-boutiste), écrit par tools/pack/build_pack.py :
- * en-tête 44 octets : 'KGR1', u32 version, N nœuds, M arêtes, P points, octets des noms,
- * f32 vmax, f32 bbox ×4 ; puis lat f32[N], lon f32[N], first i32[N+1], to i32[M], cost f32[M],
- * length f32[M], name i32[M], geoStart i32[M+1], geo f32[2P], noms UTF-8 séparés par « \n ».
- */
-export function decodeGraph(buf: ArrayBuffer): Graph {
-  const dv = new DataView(buf);
-  const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
-  if (magic !== 'KGR1') throw new Error('Pack de routes invalide');
-  const n = dv.getUint32(8, true);
-  const m = dv.getUint32(12, true);
-  const p = dv.getUint32(16, true);
-  const namesLen = dv.getUint32(20, true);
-  const vmax = dv.getFloat32(24, true);
-  let off = 44;
-  const f32 = (len: number) => { const a = new Float32Array(buf, off, len); off += len * 4; return a; };
-  const i32 = (len: number) => { const a = new Int32Array(buf, off, len); off += len * 4; return a; };
-  const lat = f32(n), lon = f32(n), first = i32(n + 1), to = i32(m), cost = f32(m), length = f32(m), name = i32(m), geoStart = i32(m + 1), geo = f32(p * 2);
-  const names = namesLen ? new TextDecoder().decode(new Uint8Array(buf, off, namesLen)).split('\n') : [];
-  const from = new Int32Array(m);
-  for (let i = 0; i < n; i++) for (let e = first[i]; e < first[i + 1]; e++) from[e] = i;
-  return { lat, lon, first, to, from, cost, length, name, names, geoStart, geo, vmax, nodeCount: n, edgeCount: m };
 }
 
 // ------------------------------------------------------------ Recherche hors ligne

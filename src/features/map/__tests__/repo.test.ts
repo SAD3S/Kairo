@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { overpassQuery, parsePhoton } from '../repo';
+import { parsePhoton } from '../repo';
 
 describe('Photon', () => {
   it('nom + contexte (rue, code postal, ville)', () => {
@@ -13,18 +13,4 @@ describe('Photon', () => {
     expect(r[2]).toMatchObject({ name: 'Marseille', context: 'Provence-Alpes-Côte d’Azur' });
   });
   it('réponse vide', () => expect(parsePhoton({ features: [] })).toEqual([]));
-});
-
-describe('Overpass', () => {
-  it('trajet court : toutes les rues dans la boîte', () => {
-    const q = overpassQuery({ lat: 48.85, lon: 2.35 }, { lat: 48.86, lon: 2.36 });
-    expect(q).toContain('[out:json]');
-    expect(q).toContain('residential');
-    expect(q).toContain('out body;>;out skel qt;');
-    expect(q).not.toContain('footway');
-  });
-  it('trajet long : grands axes + détail autour de A et B', () => {
-    const q = overpassQuery({ lat: 48.85, lon: 2.35 }, { lat: 49.1, lon: 2.6 });
-    expect(q.match(/way\[/g)!.length).toBe(3);
-  });
 });

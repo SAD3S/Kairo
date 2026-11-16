@@ -13,7 +13,8 @@ export interface Manifest {
   version: string;
   bbox: [number, number, number, number];
   mapBuild: string;
-  files: { graph: PackFile; places: PackFile; tiles: PackFile };
+  /** `graph` (routes) existe dans le pack publié mais n'est plus utilisé par l'app. */
+  files: { graph?: PackFile; places: PackFile; tiles: PackFile };
 }
 export interface PackStatus {
   files: Record<string, number>;
@@ -59,16 +60,16 @@ export async function fetchManifest(): Promise<Manifest> {
   return JSON.parse(r.text);
 }
 
-export const packTotal = (m: Manifest) => m.files.graph.size + m.files.places.size + m.files.tiles.size;
+export const packTotal = (m: Manifest) => m.files.places.size + m.files.tiles.size;
 
 /** Vrai si les trois fichiers sont présents avec la bonne taille. */
 export function isComplete(m: Manifest | null, st: PackStatus | null): boolean {
   if (!m || !st) return false;
-  return Object.values(m.files).every((f) => st.files[f.name] === f.size);
+  return [m.files.places, m.files.tiles].every((f) => st.files[f.name] === f.size);
 }
 
 export function startDownload(m: Manifest) {
-  const files = [m.files.graph, m.files.places, m.files.tiles].map((f) => ({ name: f.name, url: `${PACK_BASE}/${f.name}`, size: f.size }));
+  const files = [m.files.places, m.files.tiles].map((f) => ({ name: f.name, url: `${PACK_BASE}/${f.name}`, size: f.size }));
   return OfflinePack.download({ id: PACK_ID, files });
 }
 
@@ -95,11 +96,6 @@ async function readFile(name: string, size: number, onProgress?: (r: number) => 
 async function gunzip(bytes: Uint8Array): Promise<ArrayBuffer> {
   const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
   return new Response(stream).arrayBuffer();
-}
-
-/** Graphe routier décompressé, prêt à être transféré au worker. */
-export async function loadPackGraph(m: Manifest, onProgress?: (r: number) => void): Promise<ArrayBuffer> {
-  return gunzip(await readFile(m.files.graph.name, m.files.graph.size, onProgress));
 }
 
 let indexPromise: Promise<OfflineIndex> | null = null;

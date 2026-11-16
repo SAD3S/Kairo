@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LatLon } from './geo';
-import { Place, photonSearch, RouteError } from './repo';
+import { Icon } from '../../components/Icon';
+import { Place, photonSearch, MapError } from './repo';
 import { T } from './strings';
 
 /** Champ d'adresse avec suggestions Photon : debounce 300 ms, ≥ 3 caractères, requête précédente annulée. */
@@ -18,7 +19,7 @@ export function PlaceInput({
   offline,
 }: {
   label: string;
-  dot: 'A' | 'B';
+  dot?: 'A' | 'B';
   value: Place | null;
   bias: () => LatLon | null;
   onPick: (p: Place) => void;
@@ -69,7 +70,7 @@ export function PlaceInput({
           const r = await local();
           if (r.length) { setItems(r); setState('idle'); return; }
         } catch { /* index indisponible */ }
-        setErr(e instanceof RouteError ? e.message : T.photonError);
+        setErr(e instanceof MapError ? e.message : T.photonError);
         setState('error');
       }
     }, 300);
@@ -84,7 +85,7 @@ export function PlaceInput({
   return (
     <div style={{ position: 'relative' }}>
       <div className="row" style={{ gap: 10, height: 46 }}>
-        <span className={`pin-dot pin-dot-${dot}`} aria-hidden="true">{dot}</span>
+        {dot ? <span className={`pin-dot pin-dot-${dot}`} aria-hidden="true">{dot}</span> : <span aria-hidden="true" style={{ color: 'var(--dim)', display: 'flex' }}><Icon name="search" size={18} /></span>}
         <input
           className="route-input"
           aria-label={label}

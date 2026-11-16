@@ -15,7 +15,7 @@ import { NativeModelPanel } from '../components/NativeModelPanel';
 import { lazy, Suspense } from 'react';
 
 // Chargé à la demande (dépend de la bibliothèque de carte).
-const OfflinePackPanel = lazy(() => import('../features/route/OfflinePackPanel').then((m) => ({ default: m.OfflinePackPanel })));
+const OfflinePackPanel = lazy(() => import('../features/map/OfflinePackPanel').then((m) => ({ default: m.OfflinePackPanel })));
 
 const ACCENTS = ['#8B8CF8', '#6FCFE0', '#E9A15B', '#7BD88F', '#E58FD0'];
 

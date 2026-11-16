@@ -9,7 +9,7 @@ import {
 } from './packStore';
 
 const fmt = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(2).replace('.', ',')} Go` : `${Math.round(n / 1e6)} Mo`);
-const FILE_LABEL: Record<string, string> = { 'graph.bin.gz': 'routes', 'places.json.gz': 'adresses', 'tiles.pmtiles': 'carte' };
+const FILE_LABEL: Record<string, string> = { 'places.json.gz': 'adresses', 'tiles.pmtiles': 'carte' };
 
 /** Réglages → Cartes hors ligne : télécharger, mettre à jour ou supprimer le pack Île-de-France. */
 export function OfflinePackPanel() {
@@ -79,7 +79,7 @@ export function OfflinePackPanel() {
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>{PACK_NAME}</span>
-          <span style={{ fontSize: 12, color: 'var(--dim)' }}>Paris + 7 départements · carte, routes, adresses</span>
+          <span style={{ fontSize: 12, color: 'var(--dim)' }}>Paris + 7 départements · carte et recherche de lieux</span>
         </span>
         <span className={`tag ${complete ? 'accent' : ''}`}>{complete ? `INSTALLÉ · ${installed!.version}` : total ? fmt(total) : '…'}</span>
       </div>
@@ -121,7 +121,7 @@ export function OfflinePackPanel() {
       ) : remote ? (
         <>
           <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>
-            Itinéraires instantanés et sans réseau dans toute l’Île-de-France, carte et recherche d’adresses (rues, communes, gares, lieux connus) hors ligne. Wi-Fi conseillé ; la 4G fonctionne aussi.
+            Carte et recherche de lieux (rues, communes, gares, lieux connus) sans réseau dans toute l’Île-de-France. Wi-Fi conseillé ; la 4G fonctionne aussi.
           </p>
           <button className="btn primary" onClick={() => download(remote)}>
             <Icon name="download" size={16} />{st && st.received > 0 ? 'Reprendre' : 'Télécharger'} ({fmt(total)})

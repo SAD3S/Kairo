@@ -14,7 +14,7 @@ export function BottomNav({ active }: { active: 'home' | 'notes' | 'chat' | 'cam
       {item('notes', 'note', 'Notes')}
       {item('chat', 'spark', 'Assistant IA', 'ai')}
       {item('camera', 'camera', 'Caméra')}
-      {item('route', 'map', 'Itinéraire')}
+      {item('route', 'map', 'Carte')}
     </nav>
   );
 }
