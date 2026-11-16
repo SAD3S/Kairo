@@ -3,3 +3,4 @@ dist
 public/genai-wasm
 android/app/build
 .DS_Store
+*.tsbuildinfo
