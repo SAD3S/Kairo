@@ -46,6 +46,18 @@ Ouvre **http://localhost:5173** dans Chrome. Dans les Réglages de l'app, l'adre
 
 ## 3. Installer l'app sur ton téléphone Android
 
+### Le plus simple : télécharger l'APK
+
+À chaque mise à jour du code, GitHub fabrique l'app automatiquement (onglet *Actions*).
+
+1. Sur ton téléphone, ouvre **https://github.com/SAD3S/Kairo/releases/latest**
+2. Touche **Kairo.apk** pour le télécharger, puis ouvre-le.
+3. Android demande d'autoriser l'installation depuis ton navigateur : accepte.
+
+Pour mettre à jour : même chose, la nouvelle version s'installe par-dessus (tes données sont gardées).
+
+### Avec Android Studio (pour développer)
+
 1. Sur le téléphone : Paramètres → À propos → touche 7 fois « Numéro de build »,
    puis Options pour les développeurs → active **Débogage USB**.
 2. Branche le téléphone au Mac en USB et accepte l'autorisation.
