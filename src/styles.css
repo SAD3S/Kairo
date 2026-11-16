@@ -239,3 +239,14 @@ textarea.input { height: auto; padding: 12px 14px; resize: none; line-height: 1.
 /* Recherche d'adresse en cours : rien ne doit gêner les suggestions. */
 .route-searching .route-panel, .route-searching .nav { opacity: 0; pointer-events: none; }
 .route-panel { transition: opacity .15s; }
+
+/* HUD de l'algorithme : sous la recherche, jamais par-dessus (masqué pendant la saisie). */
+.algo-hud { position: absolute; top: calc(var(--top) + 118px); left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 16px; white-space: nowrap; }
+.route-searching .algo-hud { opacity: 0; }
+.hud-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 64px; }
+.hud-val { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--text); }
+.hud-key { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); }
+.hud-sep { width: 1px; height: 24px; background: var(--line); }
+/* Bouton Recentrer (navigation) : à droite, au-dessus du panneau du bas. */
+.recenter { position: absolute; right: 12px; bottom: calc(var(--bottom) + 104px); z-index: 7; width: auto; height: 46px; border-radius: 23px; padding: 0 16px 0 12px; gap: 8px; color: var(--a); font-size: 14px; font-weight: 600; }
+.recenter span { color: var(--text); }

@@ -20,7 +20,7 @@ import { currentPosition, keepScreenOn, speak, stopSpeaking, watchPosition } fro
 import { useMap } from './useMap';
 import { PlaceInput } from './PlaceInput';
 
-const DURATIONS = [0, 2000, 5000, 10000, 20000];
+const DURATIONS = [0, 3000, 7000, 12000, 20000];
 type Phase = 'idle' | 'loading' | 'animating' | 'result' | 'nav';
 
 function ArrowIcon({ type, size = 34 }: { type: ManeuverType | 'straight'; size?: number }) {
@@ -89,6 +89,9 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
   const planRef = useRef<RoutePlan | null>(null);
   const reroutingRef = useRef(false);
   const heading = useRef(0);
+  const followingRef = useRef(true);
+  const [following, setFollowing] = useState(true);
+  const [hud, setHud] = useState<{ explored: number; elapsed: number } | null>(null);
 
   const map = useMap(mapBox, mapStyle, (p) => { if (phase !== 'nav') setPressed(p); });
 
@@ -108,7 +111,7 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
   useEffect(() => { if (map.ready) map.setPoint('B', b, !!b); }, [b, map.ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetRoute = () => {
-    map.clearExplored();
+    map.wave?.clear();
     map.setRoute(null);
     setPlan(null);
     setStats(null);
@@ -172,20 +175,26 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
     abort.current?.abort();
     const ctrl = new AbortController();
     abort.current = ctrl;
-    map.clearExplored();
+    map.wave?.clear();
     map.setRoute(null);
     setPlan(null);
+    setHud(null);
     setPhase('loading');
     try {
       const slot = await ensureGraph(a, b, ctrl.signal);
       setSlotUsed(slot);
       setPhase('animating');
       setStatus({ s: 'think', label: T.exploring, sub: algo === 'astar' ? 'A*' : 'Dijkstra' });
-      map.fit([[a.lon, a.lat], [b.lon, b.lat]]);
-      const r = await engine.run(algo, a, b, DURATIONS[speedIdx], slot, (lines) => map.addExplored(lines));
-      map.clearExplored();
-      map.setRoute(r.plan.coords);
-      map.fit(r.plan.coords);
+      map.wave?.frame50(a, b);
+      const r = await engine.run(algo, a, b, slot, true);
+      perfMark('route.compute', r.ms, `${algo === 'astar' ? 'A*' : 'Dijkstra'}, ${r.visited.toLocaleString('fr-FR')} nœuds`);
+      if (map.wave && r.trace) {
+        setHud({ explored: 0, elapsed: 0 });
+        await map.wave.play(r.trace, DURATIONS[speedIdx], r.plan.coords, b, (p) => setHud({ explored: p.explored, elapsed: p.elapsed }));
+      } else {
+        map.setRoute(r.plan.coords);
+        map.fit(r.plan.coords);
+      }
       setPlan(r.plan);
       planRef.current = r.plan;
       setStats({ visited: r.visited, algo, nodes: slot === 'pack' ? packNodes.current : graphNodes.current });
@@ -209,13 +218,13 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
       abort.current = ctrl;
       let slot = canUsePack(from, b) ? await ensureGraph(from, b, ctrl.signal) : slotUsed;
       try {
-        r = await engine.run(algo, from, b, 0, slot);
+        r = await engine.run(algo, from, b, slot);
       } catch (e) {
         if (!(e instanceof OutsideError)) throw e;
         // Hors de la zone chargée : on recharge les routes depuis la position actuelle.
         graphKey.current = '';
         slot = await ensureGraph(from, b, ctrl.signal);
-        r = await engine.run(algo, from, b, 0, slot);
+        r = await engine.run(algo, from, b, slot);
       }
       planRef.current = r.plan;
       setPlan(r.plan);
@@ -240,13 +249,26 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
     setNavMsg('');
     setNav(u);
     map.setUser(f, heading.current);
-    map.map?.easeTo({ center: [f.lon, f.lat], bearing: heading.current, pitch: 50, zoom: 17, duration: 900 });
+    if (followingRef.current) map.map?.easeTo({ center: [f.lon, f.lat], bearing: heading.current, pitch: 50, zoom: 17, duration: 900 });
     if (u.speak) speak(u.speak);
     if (u.reroute) reroute(f);
   };
 
+  /** Recentrer : retour doux sur la position (500 ms) et réactivation du suivi. */
+  const recenter = () => {
+    followingRef.current = true;
+    setFollowing(true);
+    const f = lastFix.current;
+    if (f) map.map?.easeTo({ center: [f.lon, f.lat], bearing: heading.current, pitch: 50, zoom: 17, duration: 500 });
+  };
+
   const startNav = async () => {
     if (!planRef.current) return;
+    map.wave?.clear();
+    map.setRoute(planRef.current.coords);
+    followingRef.current = true;
+    setFollowing(true);
+    map.onUserGesture(() => { followingRef.current = false; setFollowing(false); });
     setErr('');
     setNav(null);
     setNavMsg(T.gpsWaiting);
@@ -263,6 +285,7 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
   };
 
   const stopNav = () => {
+    map.onUserGesture(null);
     stopWatch.current?.();
     stopWatch.current = null;
     tracker.current = null;
@@ -327,6 +350,17 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
             />
           </div>
 
+          {/* HUD de l'algorithme pendant l'animation */}
+          {hud && (phase === 'animating' || phase === 'result') && (
+            <div className="glass algo-hud" role="status" aria-live="off">
+              <span className="hud-cell"><span className="hud-val">{hud.explored.toLocaleString('fr-FR')}</span><span className="hud-key">{T.hudNodes}</span></span>
+              <span className="hud-sep" />
+              <span className="hud-cell"><span className="hud-val">{(hud.elapsed / 1000).toFixed(1).replace('.', ',')} s</span><span className="hud-key">{T.hudTime}</span></span>
+              <span className="hud-sep" />
+              <span className="hud-cell"><span className="hud-val" style={{ color: 'var(--a-soft)' }}>{algo === 'astar' ? 'A*' : 'Dijkstra'}</span><span className="hud-key">{T.hudAlgo}</span></span>
+            </div>
+          )}
+
           {/* Appui long : A ou B */}
           {pressed && !busy && (
             <div className="glass route-panel rise" role="dialog" aria-label={T.pinnedPoint} style={{ bottom: 'calc(var(--bottom) + 84px)' }}>
@@ -355,7 +389,7 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
                     </span>
                   </div>
                   <div className="row" style={{ gap: 8 }}>
-                    <button className="btn" style={{ flex: 1 }} onClick={() => { abort.current?.abort(); engine.skip(); if (phase === 'loading') setPhase('idle'); }}>{phase === 'animating' ? T.skip : 'Annuler'}</button>
+                    <button className="btn" style={{ flex: 1 }} onClick={() => { if (phase === 'animating') map.wave?.skip(); else { abort.current?.abort(); setPhase('idle'); } }}>{phase === 'animating' ? T.skip : 'Annuler'}</button>
                   </div>
                 </>
               ) : phase === 'result' && plan ? (
@@ -367,7 +401,7 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
                   {stats && <span className="label" style={{ fontSize: 10 }}>{slotUsed === 'pack' ? `${T.offlineTag} · ` : ''}{stats.algo === 'astar' ? 'A*' : 'Dijkstra'} · {T.visited(stats.visited)} / {stats.nodes.toLocaleString('fr-FR')}</span>}
                   <div className="row" style={{ gap: 8 }}>
                     <button className="btn" onClick={() => { resetRoute(); setPhase('idle'); }} aria-label="Modifier"><Icon name="back" size={16} /></button>
-                    <button className="btn" style={{ flex: 1 }} onClick={() => { setAlgo(algo === 'astar' ? 'dijkstra' : 'astar'); setPhase('idle'); map.setRoute(null); }}>Comparer avec {algo === 'astar' ? 'Dijkstra' : 'A*'}</button>
+                    <button className="btn" style={{ flex: 1 }} onClick={() => { setAlgo(algo === 'astar' ? 'dijkstra' : 'astar'); setPhase('idle'); map.wave?.clear(); map.setRoute(null); }}>Comparer avec {algo === 'astar' ? 'Dijkstra' : 'A*'}</button>
                     <button className="btn primary" style={{ flex: 1.2 }} onClick={startNav}><Icon name="nav" size={16} />{T.start}</button>
                   </div>
                 </>
@@ -417,6 +451,12 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
             <div className="glass nav-toast">
               {rerouting ? <><Loader status="think" />{T.recalculating}</> : navMsg}
             </div>
+          )}
+          {!following && (
+            <button className="icon-btn glass recenter rise" aria-label={T.recenter} onClick={recenter}>
+              <Icon name="nav" size={20} />
+              <span>{T.recenter}</span>
+            </button>
           )}
           <div className="glass route-panel" style={{ bottom: 'calc(var(--bottom) + 16px)' }}>
             <div className="row" style={{ justifyContent: 'space-between' }}>

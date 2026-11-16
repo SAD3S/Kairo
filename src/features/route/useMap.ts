@@ -7,6 +7,7 @@ import mlWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 setWorkerUrl(mlWorkerUrl);
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { LatLon } from './geo';
+import { Wave } from './wave';
 import { perfMark } from '../../lib/perf';
 
 export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
@@ -27,9 +28,10 @@ function markerEl(kind: 'A' | 'B' | 'user') {
 export interface MapApi {
   map: MlMap | null;
   ready: boolean;
-  /** Ajoute des arêtes explorées ; l'affichage est regroupé (au plus ~12 rafraîchissements/s). */
-  addExplored(lines: [number, number][][]): void;
-  clearExplored(): void;
+  /** Rendu animé de la recherche (créé au chargement de la carte). */
+  wave: Wave | null;
+  /** Vrai tant que la caméra suit la position (navigation). */
+  onUserGesture(cb: (() => void) | null): void;
   setRoute(coords: [number, number][] | null): void;
   setPoint(kind: 'A' | 'B', p: LatLon | null, center?: boolean): void;
   setUser(p: LatLon | null, bearing?: number): void;
@@ -39,8 +41,8 @@ export interface MapApi {
 export function useMap(container: React.RefObject<HTMLDivElement | null>, style: string | object, onLongPress: (p: LatLon) => void): MapApi {
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
-  const explored = useRef<[number, number][][]>([]);
-  const flushTimer = useRef<number | null>(null);
+  const waveRef = useRef<Wave | null>(null);
+  const gestureCb = useRef<(() => void) | null>(null);
   const markers = useRef<Partial<Record<'A' | 'B' | 'user', Marker>>>({});
   const longPressCb = useRef(onLongPress);
   longPressCb.current = onLongPress;
@@ -59,8 +61,7 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, style:
     });
     mapRef.current = map;
     map.on('load', () => {
-      map.addSource('explored', { type: 'geojson', data: EMPTY });
-      map.addLayer({ id: 'explored', type: 'line', source: 'explored', paint: { 'line-color': '#5AA9FF', 'line-opacity': 0.5, 'line-width': 1.6 }, layout: { 'line-cap': 'round' } });
+      waveRef.current = new Wave(map, typeof style !== 'string');
       map.addSource('route', { type: 'geojson', data: EMPTY });
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', paint: { 'line-color': '#2B2B8C', 'line-width': 10, 'line-opacity': 0.9 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
       map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#8B8CF8', 'line-width': 6 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
@@ -83,6 +84,9 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, style:
     map.on('touchend', cancel);
     map.on('touchcancel', cancel);
     map.on('movestart', (e: any) => { if (e.originalEvent) cancel(); });
+    // Geste de l'utilisateur (glisser, zoomer, tourner, incliner) : coupe le suivi en navigation.
+    const gesture = (e: any) => { if (e.originalEvent) gestureCb.current?.(); };
+    for (const ev of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart'] as const) map.on(ev, gesture);
     map.on('contextmenu', (e: any) => longPressCb.current({ lat: e.lngLat.lat, lon: e.lngLat.lng }));
 
     return () => {
@@ -93,11 +97,6 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, style:
   }, [container]);
 
   const src = (id: string) => mapRef.current?.getSource(id) as GeoJSONSource | undefined;
-
-  const flush = () => {
-    flushTimer.current = null;
-    src('explored')?.setData({ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: explored.current } });
-  };
 
   const setMarker = (kind: 'A' | 'B' | 'user', p: LatLon | null, rotation = 0) => {
     const map = mapRef.current;
@@ -113,15 +112,11 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, style:
   return {
     map: mapRef.current,
     ready,
-    addExplored(lines) {
-      for (const l of lines) explored.current.push(l);
-      if (flushTimer.current === null) flushTimer.current = window.setTimeout(flush, 80);
+    get wave() {
+      return waveRef.current;
     },
-    clearExplored() {
-      explored.current = [];
-      if (flushTimer.current !== null) window.clearTimeout(flushTimer.current);
-      flushTimer.current = null;
-      src('explored')?.setData(EMPTY);
+    onUserGesture(cb) {
+      gestureCb.current = cb;
     },
     setRoute(coords) {
       src('route')?.setData(coords ? { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } : EMPTY);

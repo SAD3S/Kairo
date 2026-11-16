@@ -8,7 +8,7 @@ export const PERF_LABELS: Record<string, string> = {
   'graph.download': 'Routes : téléchargement (Overpass)',
   'graph.build': 'Routes : construction du graphe',
   'graph.pack': 'Routes : chargement du pack hors ligne',
-  'route.compute': 'Itinéraire : calcul sans animation',
+  'route.compute': 'Itinéraire : calcul (sans l’animation)',
   'ai.firstToken': 'IA : premier mot affiché',
   'ai.total': 'IA : réponse complète',
 };

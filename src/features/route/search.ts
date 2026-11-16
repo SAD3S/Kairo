@@ -53,11 +53,17 @@ class MinHeap {
   }
 }
 
+/** Lot d'arêtes explorées, avec le coût depuis le départ (s) à leur extrémité. */
+export interface ExploredBatch {
+  edges: number[];
+  costs: number[];
+}
+
 /**
  * Recherche du plus court chemin (en temps).
  * Toutes les `batch` itérations, le générateur produit la liste des arêtes explorées depuis la dernière fois.
  */
-export function* shortestPath(g: Graph, source: number, target: number, algo: Algo, batch = 200): Generator<number[], SearchResult, void> {
+export function* shortestPath(g: Graph, source: number, target: number, algo: Algo, batch = 200): Generator<ExploredBatch, SearchResult, void> {
   const n = g.nodeCount;
   const best = new Float64Array(n).fill(Infinity);
   const prevEdge = new Int32Array(n).fill(-1);
@@ -70,6 +76,7 @@ export function* shortestPath(g: Graph, source: number, target: number, algo: Al
   best[source] = 0;
   heap.push(h(source), source);
   let explored: number[] = [];
+  let costs: number[] = [];
   let visited = 0;
   let iter = 0;
 
@@ -82,8 +89,9 @@ export function* shortestPath(g: Graph, source: number, target: number, algo: Al
     for (let e = g.first[u]; e < g.first[u + 1]; e++) {
       const v = g.to[e];
       if (done[v]) continue;
-      explored.push(e);
       const nd = best[u] + g.cost[e];
+      explored.push(e);
+      costs.push(nd);
       if (nd < best[v]) {
         best[v] = nd;
         prevEdge[v] = e;
@@ -91,11 +99,12 @@ export function* shortestPath(g: Graph, source: number, target: number, algo: Al
       }
     }
     if (++iter % batch === 0 && explored.length) {
-      yield explored;
+      yield { edges: explored, costs };
       explored = [];
+      costs = [];
     }
   }
-  if (explored.length) yield explored;
+  if (explored.length) yield { edges: explored, costs };
 
   if (!done[target] || best[target] === Infinity) return { found: false, edges: [], nodes: [], time: 0, distance: 0, visited };
   const edges: number[] = [];

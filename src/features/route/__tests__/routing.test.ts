@@ -83,7 +83,13 @@ describe('Dijkstra et A*', () => {
     const it = shortestPath(g, src, dst, 'dijkstra', 5);
     let batches = 0;
     let r = it.next();
-    while (!r.done) { batches++; expect(r.value.length).toBeGreaterThan(0); r = it.next(); }
+    while (!r.done) {
+      batches++;
+      expect(r.value.edges.length).toBeGreaterThan(0);
+      expect(r.value.costs.length).toBe(r.value.edges.length);
+      expect(r.value.costs.every((c) => c >= 0)).toBe(true);
+      r = it.next();
+    }
     expect(batches).toBeGreaterThan(3);
     expect(r.value.found).toBe(true);
   });
@@ -192,5 +198,40 @@ describe('suivi de navigation', () => {
     expect(u.arrived).toBe(true);
     expect(u.speak).toBe('Vous êtes arrivé');
     expect(t.update(at(48.86, 2.3599), 2000).speak).toBeUndefined();
+  });
+});
+
+import { easeInOut, MAX_TRACE_EDGES, shownAt, TraceRecorder } from '../trace';
+describe('animation (trace)', () => {
+  it('courbe ease-in-out et progression pilotée par le temps', () => {
+    expect(easeInOut(0)).toBe(0);
+    expect(easeInOut(0.5)).toBeCloseTo(0.5);
+    expect(easeInOut(1)).toBe(1);
+    expect(easeInOut(0.1)).toBeLessThan(0.1); // départ lent
+    expect(shownAt(1000, 0, 7000)).toBe(0);
+    expect(shownAt(1000, 3500, 7000)).toBe(500);
+    expect(shownAt(1000, 9000, 7000)).toBe(1000);
+    expect(shownAt(1000, 0, 0)).toBe(1000); // instantané
+  });
+  it('enregistre l’exploration : coûts normalisés, géométrie, échantillonnage', () => {
+    const g = buildGraph(grid(8));
+    const src = nearestNode(g, { lat: 48.85, lon: 2.35 })!.node;
+    const dst = nearestNode(g, { lat: 48.857, lon: 2.357 })!.node;
+    const rec = new TraceRecorder();
+    const it = shortestPath(g, src, dst, 'dijkstra', 7);
+    let r = it.next();
+    while (!r.done) { rec.add(r.value); r = it.next(); }
+    const t = rec.build(g, r.value.time);
+    expect(t.count).toBe(t.explored);
+    expect(t.offsets[t.count] * 2).toBe(t.coords.length);
+    expect(Math.min(...t.costs)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...t.costs)).toBeLessThanOrEqual(1);
+    expect(t.costs[0]).toBeLessThan(t.costs[t.count - 1]); // l'onde s'éloigne de A
+    // Échantillonnage au-delà du plafond
+    const big = new TraceRecorder();
+    big.add({ edges: Array(MAX_TRACE_EDGES * 3).fill(0), costs: Array(MAX_TRACE_EDGES * 3).fill(1) });
+    const bt = big.build(g, 10);
+    expect(bt.count).toBe(MAX_TRACE_EDGES);
+    expect(bt.offsets[1] - bt.offsets[0]).toBe(2); // segments droits
   });
 });

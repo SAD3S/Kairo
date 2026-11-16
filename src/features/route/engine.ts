@@ -4,6 +4,7 @@ import { RoutePlan } from './instructions';
 import type { GraphSlot, WorkerOut } from './protocol';
 import { RouteError } from './repo';
 import { Algo } from './search';
+import type { Trace } from './trace';
 import { T } from './strings';
 
 export class OutsideError extends RouteError {}
@@ -44,13 +45,12 @@ export class RouteEngine {
     return this.load('pack', { type: 'graph-bin', buf }, [buf]);
   }
 
-  run(algo: Algo, a: LatLon, b: LatLon, durationMs: number, slot: GraphSlot, onExplored?: (lines: [number, number][][]) => void): Promise<{ plan: RoutePlan; visited: number }> {
+  run(algo: Algo, a: LatLon, b: LatLon, slot: GraphSlot, withTrace = false): Promise<{ plan: RoutePlan; visited: number; ms: number; trace?: Trace }> {
     const id = ++this.id;
     return new Promise((resolve, reject) => {
       const off = this.listen((m) => {
         if (!('id' in m) || m.id !== id) return;
-        if (m.type === 'explored') onExplored?.(m.lines);
-        else if (m.type === 'done') { off(); resolve({ plan: m.plan, visited: m.visited }); }
+        if (m.type === 'done') { off(); resolve({ plan: m.plan, visited: m.visited, ms: m.ms, trace: m.trace }); }
         else if (m.type === 'error') {
           off();
           if (m.code === 'outside') reject(new OutsideError(T.tooFarFromRoad(m.distance ?? 0)));
@@ -59,12 +59,8 @@ export class RouteEngine {
           else reject(new RouteError(T.overpassError));
         }
       });
-      this.w.postMessage({ type: 'run', id, algo, a, b, durationMs, slot });
+      this.w.postMessage({ type: 'run', id, algo, a, b, slot, trace: withTrace });
     });
-  }
-
-  skip() {
-    this.w.postMessage({ type: 'skip' });
   }
 
   dispose() {
