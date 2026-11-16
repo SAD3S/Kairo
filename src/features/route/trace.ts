@@ -4,7 +4,7 @@ import { edgeCoords, Graph } from './graph';
 import { ExploredBatch } from './search';
 
 /** Au-delà, on échantillonne : l'effet visuel est identique et le téléphone reste fluide. */
-export const MAX_TRACE_EDGES = 40000;
+export const MAX_TRACE_EDGES = 25000;
 
 export interface Trace {
   /** Points [lon, lat] à plat ; l'arête i occupe les points offsets[i] … offsets[i+1]-1. */

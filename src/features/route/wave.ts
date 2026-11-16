@@ -6,11 +6,13 @@ import { cumulative, pointAt } from './instructions';
 import { shownAt, Trace } from './trace';
 
 /** Palette : cyan → violet de l'app (#8B8CF8) → magenta. */
-export const WAVE = { start: '#00E5FF', mid: '#8B8CF8', end: '#FF2D95', path: '#00FF9C', frontier: '#FFF3B0' };
+export const WAVE = { start: '#00E5FF', mid: '#8B8CF8', end: '#FF2D95', path: '#00FF9C', };
 const EMPTY: any = { type: 'FeatureCollection', features: [] };
-const FADE_FRAMES = 45; // âge (en images) après lequel une arête atteint son opacité minimale
 const DIM = 'wave-dim';
 
+const GLOW_W: any = ['interpolate', ['exponential', 1.5], ['zoom'], 9, 2, 12, 5, 14, 9, 17, 14];
+const GLOW_BLUR: any = ['interpolate', ['linear'], ['zoom'], 9, 1.5, 12, 3.5, 14, 6, 17, 9];
+const CORE_W: any = ['interpolate', ['exponential', 1.5], ['zoom'], 9, 0.6, 12, 1.2, 14, 2, 17, 3];
 const colorBy = ['interpolate', ['linear'], ['get', 'c'], 0, WAVE.start, 0.5, WAVE.mid, 1, WAVE.end];
 
 export interface WaveProgress {
@@ -22,7 +24,6 @@ export interface WaveProgress {
 export class Wave {
   private raf = 0;
   private skipFlag = false;
-  private frame = 0;
   private fade = 1;
 
   constructor(private map: MlMap, private darkBase: boolean) {
@@ -30,14 +31,11 @@ export class Wave {
     // Voile qui assombrit et désature le fond pendant la recherche (instantané : pas de changement de style).
     map.addLayer({ id: DIM, type: 'background', paint: { 'background-color': '#05060C', 'background-opacity': 0 } });
     add('wave');
-    map.addLayer({ id: 'wave-glow', type: 'line', source: 'wave', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': colorBy as any, 'line-width': 9, 'line-blur': 6, 'line-opacity': 0.35 } });
-    map.addLayer({ id: 'wave-core', type: 'line', source: 'wave', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': colorBy as any, 'line-width': 2, 'line-opacity': 0.9 } });
-    add('wave-front');
-    map.addLayer({ id: 'wave-front-halo', type: 'circle', source: 'wave-front', paint: { 'circle-color': WAVE.frontier, 'circle-radius': 8, 'circle-blur': 1, 'circle-opacity': 0.45 } });
-    map.addLayer({ id: 'wave-front-dot', type: 'circle', source: 'wave-front', paint: { 'circle-color': '#FFFFFF', 'circle-radius': 2.2, 'circle-opacity': 0.95 } });
+    map.addLayer({ id: 'wave-glow', type: 'line', source: 'wave', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': colorBy as any, 'line-width': GLOW_W, 'line-blur': GLOW_BLUR, 'line-opacity': 0 } });
+    map.addLayer({ id: 'wave-core', type: 'line', source: 'wave', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': colorBy as any, 'line-width': CORE_W, 'line-opacity': 0 } });
     add('wave-path');
-    map.addLayer({ id: 'wave-path-glow', type: 'line', source: 'wave-path', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': WAVE.path, 'line-width': 16, 'line-blur': 10, 'line-opacity': 0.45 } });
-    map.addLayer({ id: 'wave-path', type: 'line', source: 'wave-path', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': WAVE.path, 'line-width': 6 } });
+    map.addLayer({ id: 'wave-path-glow', type: 'line', source: 'wave-path', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': WAVE.path, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 10, 8, 14, 16, 18, 26] as any, 'line-blur': ['interpolate', ['linear'], ['zoom'], 10, 5, 14, 10, 18, 14] as any, 'line-opacity': 0.45 } });
+    map.addLayer({ id: 'wave-path', type: 'line', source: 'wave-path', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': WAVE.path, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 10, 3, 14, 6, 18, 9] as any } });
     add('wave-flash');
     map.addLayer({ id: 'wave-flash', type: 'circle', source: 'wave-flash', paint: { 'circle-color': WAVE.path, 'circle-radius': 0, 'circle-blur': 0.6, 'circle-opacity': 0 } });
   }
@@ -51,18 +49,22 @@ export class Wave {
     this.map.setPaintProperty(DIM, 'background-opacity', v * (this.darkBase ? 0.55 : 0.78));
   }
 
-  /** Opacité des arêtes selon leur âge : récentes à fond, anciennes vers 0,25 (mis à jour par lots). */
-  private setAge() {
-    const age = ['-', this.frame, ['get', 'b']];
-    this.map.setPaintProperty('wave-core', 'line-opacity', ['*', this.fade, ['interpolate', ['linear'], age, 0, 1, FADE_FRAMES, 0.25]] as any);
-    this.map.setPaintProperty('wave-glow', 'line-opacity', ['*', this.fade, ['interpolate', ['linear'], age, 0, 0.5, FADE_FRAMES, 0.18]] as any);
+  /**
+   * Révèle les `shown` premières arêtes : opacité selon leur âge (récentes à fond, anciennes vers 0,25).
+   * Seule une expression de style change à chaque image ; les données ne sont jamais renvoyées.
+   */
+  private reveal(shown: number, span: number) {
+    const age = ['-', shown, ['get', 'o']];
+    const op = (hi: number, lo: number) => ['case', ['<', ['get', 'o'], shown], ['*', this.fade, ['interpolate', ['linear'], age, 0, hi, span, lo]], 0];
+    this.map.setPaintProperty('wave-core', 'line-opacity', op(1, 0.25) as any);
+    this.map.setPaintProperty('wave-glow', 'line-opacity', op(0.5, 0.15) as any);
   }
 
   /** Efface tout (exploration, chemin, voile). */
   clear() {
     cancelAnimationFrame(this.raf);
     this.skipFlag = false;
-    for (const id of ['wave', 'wave-front', 'wave-path', 'wave-flash']) this.src(id)?.setData(EMPTY);
+    for (const id of ['wave', 'wave-path', 'wave-flash']) this.src(id)?.setData(EMPTY);
     this.setDim(0);
   }
 
@@ -73,8 +75,8 @@ export class Wave {
   /** Caméra inclinée à 50°, cadrée sur A–B. */
   frame50(a: LatLon, b: LatLon) {
     const bounds = new LngLatBounds([a.lon, a.lat], [a.lon, a.lat]).extend([b.lon, b.lat]);
-    const cam = this.map.cameraForBounds(bounds, { padding: { top: 230, bottom: 260, left: 50, right: 50 }, maxZoom: 16 });
-    if (cam) this.map.easeTo({ ...cam, pitch: 50, bearing: 0, duration: 900 });
+    const cam = this.map.cameraForBounds(bounds, { padding: { top: 230, bottom: 260, left: 50, right: 50 }, maxZoom: 15 });
+    if (cam) this.map.easeTo({ ...cam, pitch: 50, bearing: 0, duration: 800, easing: (t) => 1 - Math.pow(1 - t, 3) });
   }
 
   private loop(step: (now: number) => boolean) {
@@ -93,41 +95,44 @@ export class Wave {
   }
 
   /** Rejoue l'exploration en `duration` ms (courbe ease-in-out), puis la fin : flash sur B, chemin de B vers A, recadrage. */
+  /** Attend la fin d'un mouvement de caméra (ou rien s'il n'y en a pas). */
+  private cameraIdle() {
+    return new Promise<void>((resolve) => {
+      if (!this.map.isMoving()) return resolve();
+      this.map.once('moveend', () => resolve());
+    });
+  }
+
+  /** Rejoue l'exploration en `duration` ms (courbe ease-in-out), puis la fin : flash sur B, chemin de B vers A, recadrage. */
   async play(trace: Trace, duration: number, route: [number, number][], b: LatLon, onProgress: (p: WaveProgress) => void) {
     this.clear();
     this.fade = 1;
-    this.frame = 0;
+    // Toutes les arêtes envoyées d'un coup (invisibles), pendant que la caméra s'incline.
+    const feats: any[] = new Array(trace.count);
+    for (let i = 0; i < trace.count; i++) {
+      const line: [number, number][] = [];
+      for (let k = trace.offsets[i]; k < trace.offsets[i + 1]; k++) line.push([trace.coords[k * 2], trace.coords[k * 2 + 1]]);
+      feats[i] = { type: 'Feature', properties: { c: trace.costs[i], o: i }, geometry: { type: 'LineString', coordinates: line } };
+    }
+    this.reveal(0, 1);
+    await Promise.all([this.src('wave')?.setData({ type: 'FeatureCollection', features: feats }), this.cameraIdle()]);
+    // Âge : une arête pâlit sur ~15 % de l'animation.
+    const span = Math.max(30, trace.count * 0.15);
     const start = performance.now();
     let shown = 0;
     let lastHud = 0;
+    let frame = 0;
 
     // 1. Exploration
     await this.loop((now) => {
       const elapsed = Math.max(0, now - start);
       this.setDim(Math.min(1, elapsed / 400));
       const target = this.skipFlag ? trace.count : shownAt(trace.count, elapsed, duration);
-      // Données ajoutées une image sur deux (30 fois/s) : moins de retraitement des tuiles, halo toujours à 60 i/s.
-      if (target > shown && (this.frame % 2 === 0 || target === trace.count)) {
-        const feats: any[] = [];
-        for (let i = shown; i < target; i++) {
-          const line: [number, number][] = [];
-          for (let k = trace.offsets[i]; k < trace.offsets[i + 1]; k++) line.push([trace.coords[k * 2], trace.coords[k * 2 + 1]]);
-          feats.push({ type: 'Feature', id: i, properties: { c: trace.costs[i], b: this.frame }, geometry: { type: 'LineString', coordinates: line } });
-        }
-        this.src('wave')?.updateData({ add: feats });
-        // Frontière : extrémités des dernières arêtes atteintes.
-        const from = Math.max(0, target - Math.max(60, Math.min(260, target - shown)));
-        const pts: any[] = [];
-        for (let i = from; i < target; i++) pts.push({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [trace.tips[i * 2], trace.tips[i * 2 + 1]] } });
-        this.src('wave-front')?.setData({ type: 'FeatureCollection', features: pts });
+      // Révélation ~30 fois/s (une image sur deux) : moitié moins de mises à jour pour le GPU, croissance toujours continue.
+      if (target !== shown && ((frame++ & 1) === 0 || target === trace.count)) {
         shown = target;
+        this.reveal(shown, span);
       }
-      this.frame++;
-      if (this.frame % 6 === 0) this.setAge();
-      // Halo qui pulse
-      const pulse = (Math.sin(now / 160) + 1) / 2;
-      this.map.setPaintProperty('wave-front-halo', 'circle-radius', 6 + pulse * 6);
-      this.map.setPaintProperty('wave-front-halo', 'circle-opacity', 0.3 + pulse * 0.3);
       if (now - lastHud > 90) {
         lastHud = now;
         onProgress({ shown, explored: Math.round((shown / trace.count) * trace.explored), elapsed });
@@ -135,8 +140,6 @@ export class Wave {
       return shown < trace.count;
     });
     onProgress({ shown, explored: trace.explored, elapsed: performance.now() - start });
-    this.src('wave-front')?.setData(EMPTY);
-    this.setAge();
 
     // 2. Flash sur B + chemin dessiné de B vers A (1,2 s) + fondu de l'exploration (1 s)
     this.src('wave-flash')?.setData({ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [b.lon, b.lat] } });
@@ -156,19 +159,19 @@ export class Wave {
       if (p < 1) line.push(pointAt(rev, cum, d));
       if (line.length > 1) this.src('wave-path')?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: line } });
       this.fade = Math.max(0, 1 - Math.max(0, t - 300) / 1000);
-      if (this.frame++ % 2 === 0) this.setAge();
+      this.reveal(trace.count, span);
       return t < 1400 && !(this.skipFlag && t > 200);
     });
     this.src('wave-path')?.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: route } });
     this.src('wave')?.setData(EMPTY);
     this.src('wave-flash')?.setData(EMPTY);
     this.fade = 1;
-    this.setAge();
 
     // 3. Recadrage doux sur le chemin
     const bounds = route.reduce((bb, c) => bb.extend(c), new LngLatBounds(route[0], route[0]));
     const cam = this.map.cameraForBounds(bounds, { padding: { top: 230, bottom: 300, left: 50, right: 50 }, maxZoom: 16 });
-    if (cam) this.map.easeTo({ ...cam, pitch: 35, duration: 900 });
+    // Recadrage lent et doux, sans changer d'inclinaison (évite l'effet « saut » de zoom).
+    if (cam) this.map.easeTo({ ...cam, pitch: this.map.getPitch(), bearing: this.map.getBearing(), duration: 1400, easing: (t) => 1 - Math.pow(1 - t, 3) });
   }
 
   /** Retour au style normal (navigation). */
