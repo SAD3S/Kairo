@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { get, set } from 'idb-keyval';
+import { isNativeAndroid } from './ai/native';
 import { AppData, ChatMsg, DEFAULT_SETTINGS, Habit, Note, Settings } from './types';
 
 const KEY = 'kairo-data-v1';
@@ -21,7 +22,7 @@ function welcomeNote(): Note {
 }
 
 export function emptyData(): AppData {
-  return { version: 1, habits: [], notes: [welcomeNote()], chat: [], settings: { ...DEFAULT_SETTINGS } };
+  return { version: 1, habits: [], notes: [welcomeNote()], chat: [], settings: { ...DEFAULT_SETTINGS, backend: isNativeAndroid() ? 'device' : 'ollama' } };
 }
 
 let state: AppData = emptyData();
@@ -49,7 +50,7 @@ export function sanitize(raw: any): AppData {
     habits: Array.isArray(raw.habits) ? raw.habits.filter((h: any) => h && h.id && h.name).map((h: any) => ({ target: 7, log: {}, desc: '', icon: 'leaf', color: '#8B8CF8', createdAt: Date.now(), ...h })) : [],
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n: any) => n && n.id).map((n: any) => ({ title: '', body: '', tags: [], pinned: false, createdAt: Date.now(), updatedAt: Date.now(), ...n })) : base.notes,
     chat: Array.isArray(raw.chat) ? raw.chat.slice(-200) : [],
-    settings: { ...DEFAULT_SETTINGS, ...(raw.settings || {}) },
+    settings: { ...base.settings, ...(raw.settings || {}) },
   };
 }
 

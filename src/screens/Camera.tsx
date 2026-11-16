@@ -11,6 +11,9 @@ import { AiStatus, STATUS_LABEL } from '../lib/ai/types';
 import { fileToJpeg, toJpeg } from '../lib/image';
 import { Source } from '../lib/types';
 
+// Image transparente 1×1 : évite l'affiche grise par défaut du lecteur vidéo d'Android.
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
 const MODES = [
   { key: 'explain', label: 'Expliquer' },
   { key: 'read', label: 'Lire le texte' },
@@ -33,10 +36,12 @@ export function Camera() {
   const [answer, setAnswer] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
   const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setCamErr('');
+    setLive(false);
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false })
       .then((s) => {
@@ -109,11 +114,18 @@ export function Camera() {
 
   return (
     <div className="screen vf" style={{ overflow: 'hidden' }}>
-      {shot ? (
-        <img src={shot} alt="Photo analysée" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : (
-        <video ref={video} autoPlay playsInline muted style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: facing === 'user' ? 'scaleX(-1)' : undefined }} />
-      )}
+      <video
+          ref={video}
+          autoPlay
+          playsInline
+          muted
+          disablePictureInPicture
+          controls={false}
+          poster={BLANK}
+          onPlaying={() => setLive(true)}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: 'transparent', opacity: live ? 1 : 0, transition: 'opacity .25s', transform: facing === 'user' ? 'scaleX(-1)' : undefined }}
+        />
+      {shot && <img src={shot} alt="Photo analysée" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
 
       <div className="row" style={{ position: 'absolute', top: 'calc(var(--top) + 8px)', left: 16, right: 16, justifyContent: 'space-between', zIndex: 2 }}>
         <button className="icon-btn glass" aria-label="Fermer la caméra" onClick={nav.back}><Icon name="close" size={18} stroke={2} /></button>

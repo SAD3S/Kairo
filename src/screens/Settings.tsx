@@ -9,6 +9,8 @@ import { listOllamaModels } from '../lib/ai/ollama';
 import { deleteModelFile, getModelFile, hasWebGpu, importModelFile } from '../lib/ai/device';
 import { webSearch } from '../lib/ai/web';
 import { AiError } from '../lib/ai/types';
+import { isNativeAndroid } from '../lib/ai/native';
+import { NativeModelPanel } from '../components/NativeModelPanel';
 
 const ACCENTS = ['#8B8CF8', '#6FCFE0', '#E9A15B', '#7BD88F', '#E58FD0'];
 
@@ -38,7 +40,7 @@ export function Settings() {
   const jsonInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (s.backend !== 'device') return;
+    if (s.backend !== 'device' || isNativeAndroid()) return;
     hasWebGpu().then(setGpu);
     getModelFile().then(setDevFile);
   }, [s.backend]);
@@ -143,6 +145,8 @@ export function Settings() {
                 </div>
               )}
             </>
+          ) : isNativeAndroid() ? (
+            <NativeModelPanel />
           ) : (
             <>
               <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>

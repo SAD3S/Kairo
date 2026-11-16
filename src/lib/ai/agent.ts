@@ -2,13 +2,15 @@ import { AppData, ChatMsg, Source } from '../types';
 import { buildContext, REFORMAT_PROMPT, systemPrompt } from './context';
 import { deviceBackend } from './device';
 import { ollamaBackend } from './ollama';
+import { isNativeAndroid, nativeBackend } from './native';
 import { AiStatus, LlmBackend, LlmMessage } from './types';
 import { hostOf, webFetch, webSearch } from './web';
 
 export type StatusFn = (s: AiStatus, sub?: string) => void;
 
 export function backendFor(data: AppData): LlmBackend {
-  return data.settings.backend === 'device' ? deviceBackend() : ollamaBackend(data.settings);
+  if (data.settings.backend === 'device') return isNativeAndroid() ? nativeBackend() : deviceBackend();
+  return ollamaBackend(data.settings);
 }
 
 const TOOL_RE = /\[\[\s*(search|fetch)\s*:\s*([^\]]+?)\s*\]\]/i;

@@ -165,3 +165,16 @@ describe('boucle de l’agent', () => {
     expect(be.calls[0][0].content).not.toContain('[[search');
   });
 });
+
+import { splitForNative } from '../ai/native';
+describe('plugin Android', () => {
+  it('découpe system / historique / dernier message + image base64', () => {
+    const r = splitForNative([
+      { role: 'system', content: 'S' },
+      { role: 'user', content: 'a' },
+      { role: 'assistant', content: 'b' },
+      { role: 'user', content: 'c', image: 'data:image/jpeg;base64,XYZ' },
+    ]);
+    expect(r).toEqual({ system: 'S', history: [{ role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }], text: 'c', image: 'XYZ' });
+  });
+});

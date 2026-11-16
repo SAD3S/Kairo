@@ -95,7 +95,7 @@ Hugging Face (repo `google/gemma-3n-E2B-it-litert-lm`, accepte la licence Gemma)
 à copier sur le téléphone puis à importer dans l'app. Plus lent et moins fort
 qu'Ollama sur le Mac.
 
-## Les états de l'IA (loaders)
+## Les états de l’IA (loaders)
 
 | État | Quand |
 |---|---|
