@@ -69,6 +69,8 @@ export function OfflinePackPanel() {
       setInstalled(null);
       resetPackCaches();
     }
+    saveInstalled(m);
+    setInstalled(m);
     await startDownload(m);
   };
 

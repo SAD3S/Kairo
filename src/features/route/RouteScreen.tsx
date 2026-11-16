@@ -12,6 +12,7 @@ import { installedManifest, isComplete, loadPackGraph, loadPackIndex, Manifest, 
 import { MAP_STYLE } from './useMap';
 import { useStore } from '../../lib/store';
 import { useNav } from '../../nav';
+import { perfMark } from '../../lib/perf';
 import { Algo } from './search';
 import { T } from './strings';
 import { NavTracker, NavUpdate } from './tracker';
@@ -40,7 +41,20 @@ function ArrowIcon({ type, size = 34 }: { type: ManeuverType | 'straight'; size?
   );
 }
 
+/** Vérifie d'abord sur le disque si le pack hors ligne est complet, puis affiche l'écran. */
 export function RouteScreen() {
+  const [checked, setChecked] = useState<{ pack: Manifest | null } | null>(packSupported() ? null : { pack: null });
+  useEffect(() => {
+    if (checked) return;
+    OfflinePack.status({ id: 'idf' })
+      .then((st) => { const m = installedManifest(); setChecked({ pack: isComplete(m, st) ? m : null }); })
+      .catch(() => setChecked({ pack: null }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!checked) return <div className="screen" />;
+  return <RouteScreenInner pack={checked.pack} />;
+}
+
+function RouteScreenInner({ pack }: { pack: Manifest | null }) {
   const mapBox = useRef<HTMLDivElement>(null);
   const [a, setA] = useState<Place | null>(null);
   const [b, setB] = useState<Place | null>(null);
@@ -62,8 +76,7 @@ export function RouteScreen() {
   const nav0 = useNav();
   const offlineMapPref = useStore((s) => s.settings.offlineMap);
   // Pack hors ligne : connu immédiatement (localStorage), vérifié ensuite sur le disque.
-  const [pack, setPack] = useState<Manifest | null>(() => (packSupported() ? installedManifest() : null));
-  const [packChecked, setPackChecked] = useState(false);
+  const packChecked = true;
   const mapStyle = useMemo(() => (pack && offlineMapPref ? offlineStyle(pack) : MAP_STYLE), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [slotUsed, setSlotUsed] = useState<GraphSlot>('live');
   const graphKey = useRef('');
@@ -79,16 +92,6 @@ export function RouteScreen() {
 
   const map = useMap(mapBox, mapStyle, (p) => { if (phase !== 'nav') setPressed(p); });
 
-  useEffect(() => {
-    if (!packSupported()) return setPackChecked(true);
-    OfflinePack.status({ id: 'idf' })
-      .then((st) => {
-        const m = installedManifest();
-        setPack(isComplete(m, st) ? m : null);
-      })
-      .catch(() => setPack(null))
-      .finally(() => setPackChecked(true));
-  }, []);
 
   const canUsePack = (p: LatLon, q: LatLon) => !!pack && insidePack(p, pack.bbox) && insidePack(q, pack.bbox);
   const offlineSearch = pack ? async (q: string, bias0: LatLon | null) => (await loadPackIndex(pack)).search(q, bias0) : undefined;
@@ -136,10 +139,12 @@ export function RouteScreen() {
     if (canUsePack(from, to) && pack) {
       if (!engine.ready.pack) {
         setStatus({ s: 'data', label: T.loadingPack, sub: 'une seule fois par session' });
+        const t0 = performance.now();
         const buf = await loadPackGraph(pack, (r) => setStatus({ s: 'data', label: T.loadingPack, sub: `${Math.round(r * 100)} %` }));
         setStatus({ s: 'think', label: T.buildingGraph });
         const g = await engine.loadPackGraph(buf);
         packNodes.current = g.nodes;
+        perfMark('graph.pack', performance.now() - t0, `${g.nodes.toLocaleString('fr-FR')} nœuds`);
       }
       return 'pack';
     }
@@ -147,9 +152,13 @@ export function RouteScreen() {
     const key = keyOf(from, to);
     if (graphKey.current === key && engine.ready.live) return 'live';
     setStatus({ s: 'web', label: T.loadingGraph, sub: `${formatDistance(dist(from, to))} à vol d’oiseau` });
+    const t0 = performance.now();
     const json = await fetchRoads(from, to, signal);
+    const t1 = performance.now();
+    perfMark('graph.download', t1 - t0, `${formatDistance(dist(from, to))}, ${(json.length / 1e6).toFixed(1)} Mo`);
     setStatus({ s: 'think', label: T.buildingGraph, sub: `${(json.length / 1e6).toFixed(1).replace('.', ',')} Mo` });
     const g = await engine.loadGraph(json);
+    perfMark('graph.build', performance.now() - t1, `${g.nodes.toLocaleString('fr-FR')} nœuds`);
     graphKey.current = key;
     graphNodes.current = g.nodes;
     return 'live';

@@ -7,6 +7,7 @@ import mlWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 setWorkerUrl(mlWorkerUrl);
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { LatLon } from './geo';
+import { perfMark } from '../../lib/perf';
 
 export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 const EMPTY: any = { type: 'FeatureCollection', features: [] };
@@ -46,6 +47,7 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, style:
 
   useEffect(() => {
     if (!container.current) return;
+    const t0 = performance.now();
     const map = new MlMap({
       container: container.current,
       style: style as any,
@@ -63,6 +65,7 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, style:
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', paint: { 'line-color': '#2B2B8C', 'line-width': 10, 'line-opacity': 0.9 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
       map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#8B8CF8', 'line-width': 6 }, layout: { 'line-cap': 'round', 'line-join': 'round' } });
       setReady(true);
+      perfMark('map.ready', performance.now() - t0, typeof style === 'string' ? 'carte en ligne' : 'carte hors ligne');
     });
 
     // Appui long (tactile) ou clic droit : définir A ou B.

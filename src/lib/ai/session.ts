@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 import { getState, patchChat, pushChat, uid } from '../store';
 import { runAgent } from './agent';
 import { AiError, AiStatus } from './types';
+import { perfMark } from '../perf';
 
 interface SessionState {
   busy: boolean;
@@ -50,6 +51,8 @@ export async function sendChat(text: string, image?: string, focusNoteId?: strin
   controller = new AbortController();
   set({ busy: true, status: 'think', sub: undefined, draft: '', noteId: focusNoteId });
   const id = uid();
+  const t0 = performance.now();
+  let first = false;
   try {
     const r = await runAgent({
       data,
@@ -59,8 +62,12 @@ export async function sendChat(text: string, image?: string, focusNoteId?: strin
       focusNoteId,
       signal: controller.signal,
       onStatus: (status, sub) => set({ status, sub }),
-      onText: (draft) => set({ draft }),
+      onText: (draft) => {
+        if (!first) { first = true; perfMark('ai.firstToken', performance.now() - t0, data.settings.backend === 'device' ? 'IA sur le téléphone' : 'Ollama'); }
+        set({ draft });
+      },
     });
+    perfMark('ai.total', performance.now() - t0, `${r.text.length} caractères`);
     pushChat({ id, role: 'assistant', text: r.text || '…', sources: r.sources, used: r.used, noteId: focusNoteId, at: Date.now() });
   } catch (e: any) {
     if (e?.name === 'AbortError') {

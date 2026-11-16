@@ -139,12 +139,20 @@ export function offlineStyle(m: Manifest): any {
     const protocol = new Protocol();
     protocol.add(new PMTiles(new NativeSource(m.files.tiles.name)));
     addProtocol('pmtiles', protocol.tile);
+    // Polices : une plage de caractères absente de l'app ne doit pas bloquer l'affichage des noms.
+    addProtocol('kglyph', async (params: { url: string }) => {
+      try {
+        const res = await fetch(params.url.replace('kglyph://', ''));
+        if (res.ok) return { data: await res.arrayBuffer() };
+      } catch { /* plage absente */ }
+      return { data: new ArrayBuffer(0) };
+    });
     protocolReady = true;
   }
   const base = new URL('./map-assets/', document.baseURI).href;
   return {
     version: 8,
-    glyphs: `${base}fonts/{fontstack}/{range}.pbf`,
+    glyphs: `kglyph://${base}fonts/{fontstack}/{range}.pbf`,
     sprite: `${base}sprites/v4/dark`,
     sources: {
       protomaps: { type: 'vector', url: 'pmtiles://kairo-idf', attribution: '© OpenStreetMap · Protomaps' },

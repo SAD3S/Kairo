@@ -10,6 +10,7 @@ import { deleteModelFile, getModelFile, hasWebGpu, importModelFile } from '../li
 import { webSearch } from '../lib/ai/web';
 import { AiError } from '../lib/ai/types';
 import { isNativeAndroid } from '../lib/ai/native';
+import { clearPerf, PERF_LABELS, perfReport, readPerf } from '../lib/perf';
 import { NativeModelPanel } from '../components/NativeModelPanel';
 import { lazy, Suspense } from 'react';
 
@@ -40,6 +41,7 @@ export function Settings() {
   const [importing, setImporting] = useState<number | null>(null);
   const [devErr, setDevErr] = useState('');
   const [dataMsg, setDataMsg] = useState('');
+  const [perf, setPerf] = useState(() => readPerf());
   const modelInput = useRef<HTMLInputElement>(null);
   const jsonInput = useRef<HTMLInputElement>(null);
 
@@ -226,6 +228,21 @@ export function Settings() {
           </div>
           <input ref={jsonInput} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && confirm('Remplacer toutes les données actuelles par cette sauvegarde ?')) doImport(f); }} />
           {dataMsg && <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>{dataMsg}</p>}
+        </Section>
+
+        <Section title="Performances">
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>Dernières mesures prises sur cet appareil. Utilise l’app (carte, itinéraire, IA) puis reviens ici.</p>
+          {Object.keys(PERF_LABELS).filter((k) => perf[k]).map((k) => (
+            <div key={k} className="row" style={{ justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ fontSize: 13, minWidth: 0 }}>{PERF_LABELS[k]}{perf[k].note ? <span style={{ color: 'var(--dim)' }}> · {perf[k].note}</span> : null}</span>
+              <span className="tag">{perf[k].ms >= 1000 ? `${(perf[k].ms / 1000).toFixed(1).replace('.', ',')} S` : `${perf[k].ms} MS`}</span>
+            </div>
+          ))}
+          {Object.keys(perf).length === 0 && <span className="muted" style={{ fontSize: 13 }}>Aucune mesure pour l’instant.</span>}
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn small" style={{ flex: 1 }} onClick={() => { navigator.clipboard?.writeText(perfReport('v1.0')).then(() => setDataMsg('Mesures copiées.'), () => {}); }}>Copier les mesures</button>
+            <button className="btn small" onClick={() => { clearPerf(); setPerf({}); }}>Effacer</button>
+          </div>
         </Section>
 
         <p className="label" style={{ textAlign: 'center', paddingTop: 10 }}>Kairo · v1.0</p>

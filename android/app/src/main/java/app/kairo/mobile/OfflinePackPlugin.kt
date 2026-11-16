@@ -172,8 +172,9 @@ class OfflinePackPlugin : Plugin() {
   fun read(call: PluginCall) {
     val id = call.getString("id") ?: return call.reject("id manquant")
     val name = safe(call.getString("name") ?: return call.reject("name manquant"))
-    val offset = call.getLong("offset") ?: 0L
-    val length = call.getInt("length") ?: 0
+    // Attention : getLong() renvoie null quand le nombre tient dans un Int (cas de tous nos offsets).
+    val offset = call.data.optLong("offset", 0L)
+    val length = call.data.optInt("length", 0)
     reader.execute {
       try {
         val f = File(dir(id), name)
