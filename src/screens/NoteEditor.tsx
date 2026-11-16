@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import { Icon } from '../components/Icon';
 import { Loader } from '../components/Loader';
+import { FolderSheet } from '../components/FolderSheet';
 import { useNav } from '../nav';
 import { relativeLabel } from '../lib/dates';
 import { deleteNote, getState, upsertNote, useStore } from '../lib/store';
@@ -16,6 +17,8 @@ export function NoteEditor({ id }: { id: string }) {
   const nav = useNav();
   const stored = useStore((s) => s.notes.find((n) => n.id === id));
   const habits = useStore((s) => s.habits);
+  const folders = useStore((s) => s.folders);
+  const [folderSheet, setFolderSheet] = useState(false);
   const [note, setNote] = useState<Note | undefined>(stored);
   const [preview, setPreview] = useState(() => !!stored?.body);
   const [phase, setPhase] = useState<Phase>('edit');
@@ -94,6 +97,15 @@ export function NoteEditor({ id }: { id: string }) {
       <div className="scroll" style={{ flex: 1, padding: '8px 22px 120px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <input aria-label="Titre" placeholder="Titre" value={note.title} onChange={(e) => set({ title: e.target.value })}
           style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 28, fontWeight: 700, letterSpacing: -0.7, padding: 0 }} />
+        {(() => {
+          const f = folders.find((x) => x.id === note.folderId);
+          return (
+            <button onClick={() => setFolderSheet(true)} aria-label={f ? `Dossier : ${f.name}. Changer` : 'Ranger dans un dossier'}
+              style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 10, border: '1px solid var(--line)', background: f ? 'color-mix(in srgb, var(--a) 12%, var(--surface))' : 'transparent', color: f ? 'var(--a-soft)' : 'var(--dim)', fontSize: 13, fontWeight: 500, marginTop: -4 }}>
+              <Icon name={f ? 'folder' : 'folderPlus'} size={15} />{f ? f.name : 'Dossier'}
+            </button>
+          );
+        })()}
 
         {phase === 'edit' && (preview ? (
           <div className="md" onClick={() => setPreview(false)} style={{ minHeight: 200 }}>
@@ -146,6 +158,8 @@ export function NoteEditor({ id }: { id: string }) {
           </>
         )}
       </div>
+
+      {folderSheet && <FolderSheet currentId={note.folderId} onPick={(id) => set({ folderId: id })} onClose={() => setFolderSheet(false)} />}
 
       {menu && (
         <div className="sheet-back" onClick={() => setMenu(false)}>

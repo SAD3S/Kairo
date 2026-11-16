@@ -28,6 +28,8 @@ const P: Record<string, React.ReactElement> = {
   flame: <path d="M12 3c.8 3.6 5 5 5 10a5 5 0 0 1-10 0c0-2.6 1.6-3.8 2-6 1 1 1.8 2 2.4 3.2C12 7.6 12 5.4 12 3z" />,
   download: <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
   upload: <path d="M12 20V9M7 14l5-5 5 5M5 4h14" />,
+  folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
+  folderPlus: (<><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M12 10.5v5M9.5 13h5" /></>),
   flash: <path d="M13 3L5 13h6l-1 8 8-10h-6z" />,
   // Icônes d'habitudes
   sport: <path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />,

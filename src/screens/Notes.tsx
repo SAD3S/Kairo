@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon';
 import { useNav } from '../nav';
 import { relativeLabel } from '../lib/dates';
 import { scoreNote, words } from '../lib/ai/context';
-import { uid, upsertNote, useStore } from '../lib/store';
+import { createFolder, deleteFolder, renameFolder, uid, upsertNote, useStore } from '../lib/store';
+import { FolderEditSheet } from '../components/FolderSheet';
 import { Note } from '../lib/types';
 
 export function needsFormatting(n: Note) {
@@ -15,9 +16,9 @@ function excerpt(body: string) {
   return body.replace(/[#*_`>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140);
 }
 
-export function newNote(go: (id: string) => void, habitId?: string) {
+export function newNote(go: (id: string) => void, habitId?: string, folderId?: string) {
   const now = Date.now();
-  const n: Note = { id: uid(), title: '', body: '', tags: [], pinned: false, habitId, createdAt: now, updatedAt: now };
+  const n: Note = { id: uid(), title: '', body: '', tags: [], pinned: false, habitId, folderId, createdAt: now, updatedAt: now };
   upsertNote(n);
   go(n.id);
 }
@@ -26,17 +27,21 @@ export function Notes() {
   const nav = useNav();
   const notes = useStore((s) => s.notes);
   const habits = useStore((s) => s.habits);
+  const folders = useStore((s) => s.folders);
   const [q, setQ] = useState('');
-  const [tag, setTag] = useState<string | null>(null);
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<'new' | 'edit' | null>(null);
+  const folder = folders.find((f) => f.id === folderId);
+  const folderName = (id?: string) => folders.find((f) => f.id === id)?.name;
+  const countIn = (id: string) => notes.filter((n) => n.folderId === id).length;
 
-  const tags = useMemo(() => Array.from(new Set(notes.flatMap((n) => n.tags))).slice(0, 12), [notes]);
   const list = useMemo(() => {
     let l = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
-    if (tag) l = l.filter((n) => n.tags.includes(tag));
+    if (folderId) l = l.filter((n) => n.folderId === folderId);
     const w = words(q);
-    if (w.length) l = l.map((n) => ({ n, s: scoreNote(n, w) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).map((x) => x.n);
+    if (w.length) l = l.map((n) => ({ n, s: scoreNote(n, w, folderName(n.folderId)) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s).map((x) => x.n);
     return l;
-  }, [notes, q, tag]);
+  }, [notes, q, folderId, folders]); // eslint-disable-line react-hooks/exhaustive-deps
   const pinned = list.filter((n) => n.pinned);
   const recent = list.filter((n) => !n.pinned);
   const open = (id: string) => nav.go({ name: 'note', id });
@@ -46,10 +51,13 @@ export function Notes() {
       <div className="scroll page">
         <header className="row" style={{ justifyContent: 'space-between', padding: '0 4px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span className="label">{notes.length} note{notes.length > 1 ? 's' : ''}</span>
-            <h1 className="h1">Notes</h1>
+            <span className="label">{folder ? `Dossier · ${list.length} note${list.length > 1 ? 's' : ''}` : `${notes.length} note${notes.length > 1 ? 's' : ''}`}</span>
+            <h1 className="h1" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 230 }}>{folder ? folder.name : 'Notes'}</h1>
           </div>
-          <button className="icon-btn accent" aria-label="Nouvelle note" onClick={() => newNote(open)}><Icon name="plus" size={18} stroke={2.2} /></button>
+          <div className="row" style={{ gap: 8 }}>
+            {folder && <button className="icon-btn" aria-label={`Modifier le dossier ${folder.name}`} onClick={() => setSheet('edit')}><Icon name="more" size={18} /></button>}
+            <button className="icon-btn accent" aria-label={folder ? `Nouvelle note dans ${folder.name}` : 'Nouvelle note'} onClick={() => newNote(open, undefined, folderId ?? undefined)}><Icon name="plus" size={18} stroke={2.2} /></button>
+          </div>
         </header>
 
         <label className="row input" style={{ gap: 10, color: 'var(--dim)', height: 46 }}>
@@ -58,12 +66,17 @@ export function Notes() {
           {q && <button className="tag" onClick={() => setQ('')}>EFFACER</button>}
         </label>
 
-        {tags.length > 0 && (
-          <div className="scroll row" style={{ gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px' }}>
-            <button className={`chip ${tag === null ? 'on' : ''}`} onClick={() => setTag(null)}>Toutes</button>
-            {tags.map((t) => <button key={t} className={`chip ${tag === t ? 'on' : ''}`} onClick={() => setTag(t)}>{t}</button>)}
-          </div>
-        )}
+        <div className="scroll row" style={{ gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px' }} role="tablist" aria-label="Dossiers">
+          <button role="tab" aria-selected={folderId === null} className={`chip ${folderId === null ? 'on' : ''}`} onClick={() => setFolderId(null)}>Toutes</button>
+          {folders.map((f) => (
+            <button key={f.id} role="tab" aria-selected={folderId === f.id} className={`chip ${folderId === f.id ? 'on' : ''}`} onClick={() => setFolderId(f.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <Icon name="folder" size={14} />{f.name}<span style={{ opacity: 0.6, fontFamily: 'var(--mono)', fontSize: 11 }}>{countIn(f.id)}</span>
+            </button>
+          ))}
+          <button className="chip" aria-label="Nouveau dossier" onClick={() => setSheet('new')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="folderPlus" size={15} />{folders.length ? '' : 'Nouveau dossier'}
+          </button>
+        </div>
 
         {pinned.length > 0 && (
           <>
@@ -93,11 +106,15 @@ export function Notes() {
               {needsFormatting(n) && <span className="tag accent">À REMETTRE EN FORME</span>}
             </span>
             {n.body && <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--muted)' }}>{excerpt(n.body)}</span>}
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--dim)' }}>{relativeLabel(n.updatedAt)}{n.tags.length ? ` · ${n.tags.join(' · ').toUpperCase()}` : ''}</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--dim)' }}>{relativeLabel(n.updatedAt)}{!folderId && folderName(n.folderId) ? ` · ${folderName(n.folderId)!.toUpperCase()}` : ''}{n.tags.length ? ` · ${n.tags.join(' · ').toUpperCase()}` : ''}</span>
           </button>
         ))}
-        {list.length === 0 && <p className="muted" style={{ textAlign: 'center', marginTop: 30 }}>{q || tag ? 'Aucune note trouvée.' : 'Pas encore de note.'}</p>}
+        {list.length === 0 && <p className="muted" style={{ textAlign: 'center', marginTop: 30 }}>{q ? 'Aucune note trouvée.' : folder ? 'Ce dossier est vide. Touche + pour y écrire une note.' : 'Pas encore de note.'}</p>}
       </div>
+      {sheet === 'new' && <FolderEditSheet onSave={(name) => setFolderId(createFolder(name))} onClose={() => setSheet(null)} />}
+      {sheet === 'edit' && folder && (
+        <FolderEditSheet initial={folder.name} onSave={(name) => renameFolder(folder.id, name)} onDelete={() => { deleteFolder(folder.id); setFolderId(null); }} onClose={() => setSheet(null)} />
+      )}
       <BottomNav active="notes" />
     </div>
   );

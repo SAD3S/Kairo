@@ -178,3 +178,22 @@ describe('plugin Android', () => {
     expect(r).toEqual({ system: 'S', history: [{ role: 'user', text: 'a' }, { role: 'assistant', text: 'b' }], text: 'c', image: 'XYZ' });
   });
 });
+
+import { createFolder, deleteFolder, getState, setState, upsertNote } from '../store';
+describe('dossiers', () => {
+  it('pas de doublon (casse/accents), suppression garde les notes', () => {
+    setState(() => emptyData());
+    const a = createFolder('Films');
+    expect(createFolder('  films ')).toBe(a);
+    const b = createFolder('Séries');
+    expect(createFolder('series')).toBe(b);
+    expect(getState().folders.map((f) => f.name)).toEqual(['Films', 'Séries']);
+    upsertNote({ id: 'x', title: 'Dune', body: '', tags: [], pinned: false, folderId: a, createdAt: 0, updatedAt: 0 });
+    deleteFolder(a);
+    expect(getState().folders).toHaveLength(1);
+    expect(getState().notes.find((n) => n.id === 'x')!.folderId).toBeUndefined();
+  });
+  it('sanitize : anciennes sauvegardes sans dossiers', () => {
+    expect(sanitize({ notes: [] }).folders).toEqual([]);
+  });
+});

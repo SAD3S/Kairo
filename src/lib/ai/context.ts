@@ -15,9 +15,10 @@ export function words(s: string): string[] {
     .filter((w) => w.length > 2 && !STOP.has(w));
 }
 
-export function scoreNote(n: Note, query: string[]): number {
+/** `extra` : texte en plus à considérer comme titre (ex. nom du dossier). */
+export function scoreNote(n: Note, query: string[], extra = ''): number {
   if (!query.length) return 0;
-  const t = new Set(words(n.title + ' ' + n.tags.join(' ')));
+  const t = new Set(words(n.title + ' ' + n.tags.join(' ') + ' ' + extra));
   const b = words(n.body);
   let s = 0;
   for (const q of query) {
@@ -50,7 +51,7 @@ export function buildContext(data: AppData, userText: string, budget: number, fo
   const focus = focusNoteId ? data.notes.find((n) => n.id === focusNoteId) : undefined;
   const ranked = data.notes
     .filter((n) => n.id !== focus?.id)
-    .map((n) => ({ n, s: scoreNote(n, q) }))
+    .map((n) => ({ n, s: scoreNote(n, q, data.folders.find((f) => f.id === n.folderId)?.name) }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s)
     .slice(0, 5)
@@ -64,7 +65,8 @@ export function buildContext(data: AppData, userText: string, budget: number, fo
       if (remaining < 200) break;
       const max = Math.min(n === focus ? 4000 : 1500, remaining - 100);
       const body = n.body.length > max ? n.body.slice(0, max) + '…' : n.body;
-      const block = `### ${n.title || 'Sans titre'}${n === focus ? ' (note ouverte)' : ''} — ${relativeLabel(n.updatedAt)}${n.tags.length ? ' — tags : ' + n.tags.join(', ') : ''}\n${body}`;
+      const folder = data.folders.find((f) => f.id === n.folderId)?.name;
+      const block = `### ${n.title || 'Sans titre'}${n === focus ? ' (note ouverte)' : ''} — ${relativeLabel(n.updatedAt)}${folder ? ' — dossier : ' + folder : ''}${n.tags.length ? ' — tags : ' + n.tags.join(', ') : ''}\n${body}`;
       lines.push(block);
       remaining -= block.length;
       included.push(n);
@@ -73,7 +75,8 @@ export function buildContext(data: AppData, userText: string, budget: number, fo
 
   const others = data.notes.filter((n) => !included.includes(n)).slice(0, 40);
   if (others.length && remaining > 300) {
-    const list = others.map((n) => `- ${n.title || 'Sans titre'}`).join('\n');
+    const fname = (id?: string) => data.folders.find((f) => f.id === id)?.name;
+    const list = others.map((n) => `- ${n.title || 'Sans titre'}${fname(n.folderId) ? ` [${fname(n.folderId)}]` : ''}`).join('\n');
     lines.push('', 'AUTRES NOTES (titres seulement) :', list.slice(0, Math.max(0, remaining - 50)));
   }
   if (data.notes.length) used.push(`${included.length || data.notes.length} NOTE${(included.length || data.notes.length) > 1 ? 'S' : ''}`);

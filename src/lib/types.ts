@@ -21,8 +21,15 @@ export interface Note {
   tags: string[];
   pinned: boolean;
   habitId?: string;
+  folderId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
 }
 
 export interface Source {
@@ -60,6 +67,7 @@ export interface AppData {
   version: 1;
   habits: Habit[];
   notes: Note[];
+  folders: Folder[];
   chat: ChatMsg[];
   settings: Settings;
 }

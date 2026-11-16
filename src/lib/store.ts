@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { get, set } from 'idb-keyval';
 import { isNativeAndroid } from './ai/native';
-import { AppData, ChatMsg, DEFAULT_SETTINGS, Habit, Note, Settings } from './types';
+import { AppData, ChatMsg, DEFAULT_SETTINGS, Folder, Habit, Note, Settings } from './types';
 
 const KEY = 'kairo-data-v1';
 
@@ -22,7 +22,7 @@ function welcomeNote(): Note {
 }
 
 export function emptyData(): AppData {
-  return { version: 1, habits: [], notes: [welcomeNote()], chat: [], settings: { ...DEFAULT_SETTINGS, backend: isNativeAndroid() ? 'device' : 'ollama' } };
+  return { version: 1, habits: [], notes: [welcomeNote()], folders: [], chat: [], settings: { ...DEFAULT_SETTINGS, backend: isNativeAndroid() ? 'device' : 'ollama' } };
 }
 
 let state: AppData = emptyData();
@@ -49,6 +49,7 @@ export function sanitize(raw: any): AppData {
     version: 1,
     habits: Array.isArray(raw.habits) ? raw.habits.filter((h: any) => h && h.id && h.name).map((h: any) => ({ target: 7, log: {}, desc: '', icon: 'leaf', color: '#8B8CF8', createdAt: Date.now(), ...h })) : [],
     notes: Array.isArray(raw.notes) ? raw.notes.filter((n: any) => n && n.id).map((n: any) => ({ title: '', body: '', tags: [], pinned: false, createdAt: Date.now(), updatedAt: Date.now(), ...n })) : base.notes,
+    folders: Array.isArray(raw.folders) ? raw.folders.filter((f: any) => f && f.id && f.name) : [],
     chat: Array.isArray(raw.chat) ? raw.chat.slice(-200) : [],
     settings: { ...base.settings, ...(raw.settings || {}) },
   };
@@ -128,6 +129,39 @@ export function upsertNote(n: Note) {
 
 export function deleteNote(id: string) {
   setState((s) => ({ ...s, notes: s.notes.filter((n) => n.id !== id) }));
+}
+
+// ---------- Actions : dossiers ----------
+const norm = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** Crée un dossier (ou renvoie celui qui porte déjà ce nom) et retourne son id. */
+export function createFolder(name: string): string {
+  const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40);
+  if (!clean) return '';
+  const existing = state.folders.find((f) => norm(f.name) === norm(clean));
+  if (existing) return existing.id;
+  const f: Folder = { id: uid(), name: clean, createdAt: Date.now() };
+  setState((s) => ({ ...s, folders: [...s.folders, f] }));
+  return f.id;
+}
+
+export function renameFolder(id: string, name: string) {
+  const clean = name.trim().replace(/\s+/g, ' ').slice(0, 40);
+  if (!clean) return;
+  setState((s) => ({ ...s, folders: s.folders.map((f) => (f.id === id ? { ...f, name: clean } : f)) }));
+}
+
+/** Supprime le dossier ; ses notes sont gardées, sans dossier. */
+export function deleteFolder(id: string) {
+  setState((s) => ({
+    ...s,
+    folders: s.folders.filter((f) => f.id !== id),
+    notes: s.notes.map((n) => (n.folderId === id ? { ...n, folderId: undefined } : n)),
+  }));
+}
+
+export function moveNote(noteId: string, folderId?: string) {
+  setState((s) => ({ ...s, notes: s.notes.map((n) => (n.id === noteId ? { ...n, folderId } : n)) }));
 }
 
 // ---------- Actions : chat ----------
