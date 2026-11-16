@@ -16,8 +16,9 @@ export interface Habit {
 export interface Note {
   id: string;
   title: string;
-  /** Contenu en Markdown. */
+  /** Contenu : HTML riche si format = 'html', sinon Markdown. */
   body: string;
+  format?: 'md' | 'html';
   tags: string[];
   pinned: boolean;
   habitId?: string;

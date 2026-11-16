@@ -1,6 +1,7 @@
 import { habitSummary } from '../habits';
 import { longDate, relativeLabel } from '../dates';
 import { AppData, Note } from '../types';
+import { noteMarkdown, notePlain } from '../notes';
 
 const STOP = new Set(
   'les des une un le la de du et en au aux pour par sur dans avec que qui quoi est sont mon ma mes ton ta tes son sa ses ce cet cette ces pas plus moi toi lui nous vous ils elles je tu il elle on fait faire comment quel quelle quels quelles the and for with what this that'.split(' '),
@@ -19,7 +20,7 @@ export function words(s: string): string[] {
 export function scoreNote(n: Note, query: string[], extra = ''): number {
   if (!query.length) return 0;
   const t = new Set(words(n.title + ' ' + n.tags.join(' ') + ' ' + extra));
-  const b = words(n.body);
+  const b = words(notePlain(n));
   let s = 0;
   for (const q of query) {
     if (t.has(q)) s += 3;
@@ -51,7 +52,8 @@ export function buildContext(data: AppData, userText: string, budget: number, fo
 
   if (focus) {
     const max = Math.max(800, Math.floor(budget * 0.6));
-    const body = focus.body.length > max ? focus.body.slice(0, max) + '…' : focus.body;
+    const md = noteMarkdown(focus);
+    const body = md.length > max ? md.slice(0, max) + '…' : md;
     lines.push('', 'NOTE OUVERTE — SUJET PRINCIPAL DE LA CONVERSATION :', noteHeader(data, focus), body || '(note vide)');
     used.push('NOTE OUVERTE');
   }
@@ -82,7 +84,8 @@ export function buildContext(data: AppData, userText: string, budget: number, fo
     for (const n of ranked) {
       if (remaining < 300) break;
       const max = Math.min(focus ? 800 : 1500, remaining - 150);
-      const body = n.body.length > max ? n.body.slice(0, max) + '…' : n.body;
+      const md = noteMarkdown(n);
+      const body = md.length > max ? md.slice(0, max) + '…' : md;
       const block = `${noteHeader(data, n)}\n${body}`;
       lines.push(block);
       remaining -= block.length;

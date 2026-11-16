@@ -1,4 +1,5 @@
 import { AppData, ChatMsg, Source } from '../types';
+import { noteMarkdown } from '../notes';
 import { buildContext, findNoteByTitle, REFORMAT_PROMPT, systemPrompt } from './context';
 import { deviceBackend } from './device';
 import { ollamaBackend } from './ollama';
@@ -103,7 +104,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       o.onStatus('data', `lit « ${(n?.title || tool.arg).slice(0, 30)} »`);
       if (n) {
         if (!used.includes('+NOTE LUE')) used.push('+NOTE LUE');
-        messages.push({ role: 'user', content: `Contenu de la note « ${n.title || 'Sans titre'} » :\n\n${n.body.slice(0, 4000) || '(vide)'}\n\nRéponds maintenant à ma question.` });
+        messages.push({ role: 'user', content: `Contenu de la note « ${n.title || 'Sans titre'} » :\n\n${noteMarkdown(n).slice(0, 4000) || '(vide)'}\n\nRéponds maintenant à ma question.` });
       } else {
         messages.push({ role: 'user', content: `Aucune note ne s'appelle « ${tool.arg} ». Réponds avec ce que tu as.` });
       }

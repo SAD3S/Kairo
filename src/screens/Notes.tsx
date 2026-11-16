@@ -7,13 +7,15 @@ import { scoreNote, words } from '../lib/ai/context';
 import { createFolder, deleteFolder, renameFolder, uid, upsertNote, useStore } from '../lib/store';
 import { FolderEditSheet } from '../components/FolderSheet';
 import { Note } from '../lib/types';
+import { notePlain, taskCount } from '../lib/notes';
 
 export function needsFormatting(n: Note) {
+  if (n.format === 'html') return notePlain(n).length > 120 && !/<(h[1-3]|ul|ol)/.test(n.body);
   return n.body.length > 80 && !/^(#{1,3} |[-*] |\d+\. )/m.test(n.body);
 }
 
-function excerpt(body: string) {
-  return body.replace(/[#*_`>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140);
+function excerpt(n: Note) {
+  return notePlain(n).replace(/\s+/g, ' ').trim().slice(0, 140);
 }
 
 export function newNote(go: (id: string) => void, habitId?: string, folderId?: string) {
@@ -105,8 +107,8 @@ export function Notes() {
               <span style={{ fontSize: 16, fontWeight: 600 }}>{n.title || 'Sans titre'}</span>
               {needsFormatting(n) && <span className="tag accent">À REMETTRE EN FORME</span>}
             </span>
-            {n.body && <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--muted)' }}>{excerpt(n.body)}</span>}
-            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--dim)' }}>{relativeLabel(n.updatedAt)}{!folderId && folderName(n.folderId) ? ` · ${folderName(n.folderId)!.toUpperCase()}` : ''}{n.tags.length ? ` · ${n.tags.join(' · ').toUpperCase()}` : ''}</span>
+            {n.body && <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--muted)' }}>{excerpt(n)}</span>}
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--dim)' }}>{(() => { const t = taskCount(n); return t.total ? `☑ ${t.done}/${t.total} · ` : ''; })()}{relativeLabel(n.updatedAt)}{!folderId && folderName(n.folderId) ? ` · ${folderName(n.folderId)!.toUpperCase()}` : ''}{n.tags.length ? ` · ${n.tags.join(' · ').toUpperCase()}` : ''}</span>
           </button>
         ))}
         {list.length === 0 && <p className="muted" style={{ textAlign: 'center', marginTop: 30 }}>{q ? 'Aucune note trouvée.' : folder ? 'Ce dossier est vide. Touche + pour y écrire une note.' : 'Pas encore de note.'}</p>}

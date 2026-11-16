@@ -30,6 +30,10 @@ const P: Record<string, React.ReactElement> = {
   upload: <path d="M12 20V9M7 14l5-5 5 5M5 4h14" />,
   folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
   folderPlus: (<><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M12 10.5v5M9.5 13h5" /></>),
+  checklist: (<><rect x="3.5" y="4.5" width="6" height="6" rx="1.5" /><path d="M5 7.6l1.2 1.2L8.4 6.4" /><rect x="3.5" y="13.5" width="6" height="6" rx="1.5" /><path d="M13 7.5h7.5M13 16.5h7.5" /></>),
+  listBullet: (<><circle cx="5" cy="7" r="1.2" /><circle cx="5" cy="12" r="1.2" /><circle cx="5" cy="17" r="1.2" /><path d="M9.5 7H20M9.5 12H20M9.5 17H20" /></>),
+  listNum: (<><path d="M4 5.5h1.5v4M4 9.5h3M4 14.5c0-1 .8-1.5 1.5-1.5s1.5.5 1.5 1.3c0 1.2-3 2-3 3.7h3M10.5 7H20M10.5 12H20M10.5 17H20" /></>),
+  palette: (<><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2a4 4 0 0 0 4-4c0-4-3.8-7.2-8.5-7.2z" /><circle cx="7.5" cy="12" r="1.1" /><circle cx="9.5" cy="8" r="1.1" /><circle cx="14" cy="7.5" r="1.1" /></>),
   flash: <path d="M13 3L5 13h6l-1 8 8-10h-6z" />,
   // Icônes d'habitudes
   sport: <path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />,
