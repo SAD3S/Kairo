@@ -61,8 +61,8 @@ export function Settings() {
   const testWeb = async () => {
     setWebTest(null);
     try {
-      const r = await webSearch('météo Paris', s.ollamaApiKey, 1);
-      setWebTest({ ok: true, text: `Recherche web OK (${r.length} résultat).` });
+      const r = await webSearch('météo Paris', s.ollamaApiKey, 3);
+      setWebTest(r.length ? { ok: true, text: `Recherche web OK : ${r.length} résultats (ex. ${r[0].title}).` } : { ok: false, text: 'Aucun résultat reçu.' });
     } catch (e) {
       setWebTest({ ok: false, text: msg(e) });
     }
@@ -185,12 +185,17 @@ export function Settings() {
             </span>
             <button className={`switch ${s.webEnabled ? 'on' : ''}`} role="switch" aria-checked={s.webEnabled} aria-label="Recherche web" onClick={() => updateSettings({ webEnabled: !s.webEnabled })} />
           </div>
-          <label className="field">
-            <span className="label">Clé API Ollama</span>
-            <input className="input" type="password" autoComplete="off" value={s.ollamaApiKey} onChange={(e) => updateSettings({ ollamaApiKey: e.target.value.trim() })} placeholder="Colle ta clé ici" />
-            <span style={{ fontSize: 12, color: 'var(--dim)', lineHeight: 1.45 }}>Gratuite avec un compte sur ollama.com (Settings → Keys). Seules tes recherches passent par Ollama ; tes notes restent sur ton appareil.</span>
-          </label>
-          <button className="btn" disabled={!s.ollamaApiKey} onClick={testWeb}><Icon name="globe" size={16} />Tester la recherche</button>
+          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>
+            Moteur : <b>DuckDuckGo</b>, gratuit et sans compte. L’IA envoie seulement sa requête de recherche ; tes notes restent sur ton appareil.
+          </p>
+          <button className="btn" onClick={testWeb}><Icon name="globe" size={16} />Tester la recherche</button>
+          <details>
+            <summary style={{ fontSize: 13, color: 'var(--dim)', cursor: 'pointer' }}>Avancé : clé API Ollama (facultatif)</summary>
+            <label className="field" style={{ marginTop: 10 }}>
+              <input className="input" type="password" autoComplete="off" aria-label="Clé API Ollama" value={s.ollamaApiKey} onChange={(e) => updateSettings({ ollamaApiKey: e.target.value.trim() })} placeholder="Laisse vide pour DuckDuckGo" />
+              <span style={{ fontSize: 12, color: 'var(--dim)', lineHeight: 1.45 }}>Utilisée en priorité si ton offre Ollama inclut la recherche web ; sinon DuckDuckGo prend le relais.</span>
+            </label>
+          </details>
           {webTest && <p className={webTest.ok ? '' : 'err'} style={{ margin: 0, fontSize: 13, color: webTest.ok ? '#7bd88f' : undefined }}>{webTest.text}</p>}
         </Section>
 

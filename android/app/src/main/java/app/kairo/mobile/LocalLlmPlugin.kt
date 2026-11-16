@@ -3,6 +3,10 @@ package app.kairo.mobile
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.os.PowerManager
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import android.util.Base64
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -46,6 +50,14 @@ class LocalLlmPlugin : Plugin() {
   @Volatile private var backendName = ""
   @Volatile private var cancelled = false
 
+  // Téléchargement direct (dans l'app), utilisé en 4G si Android bloque le gestionnaire.
+  @Volatile private var directActive = false
+  @Volatile private var directStop = false
+  @Volatile private var directReceived = 0L
+  @Volatile private var directTotal = 0L
+  @Volatile private var directError = ""
+  private var directThread: Thread? = null
+
   private fun modelDir(): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "models").apply { mkdirs() }
   private fun modelFile() = File(modelDir(), MODEL_NAME)
   private fun partFile() = File(modelDir(), "$MODEL_NAME.download")
@@ -63,7 +75,17 @@ class LocalLlmPlugin : Plugin() {
     var received = 0L
     var total = 0L
     var error = ""
-    if (state != "ready" && id >= 0) {
+    var reason = 0
+    if (state != "ready" && directActive) {
+      state = "downloading"
+      received = directReceived
+      total = directTotal
+    } else if (state != "ready" && directError.isNotEmpty()) {
+      error = directError
+      directError = ""
+      received = partFile().length()
+    }
+    if (state != "ready" && !directActive && id >= 0) {
       dm().query(DownloadManager.Query().setFilterById(id))?.use { c ->
         if (c.moveToFirst()) {
           val st = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
@@ -83,13 +105,19 @@ class LocalLlmPlugin : Plugin() {
               prefs().edit().remove("downloadId").apply()
               partFile().delete()
             }
-            DownloadManager.STATUS_PAUSED -> state = "paused"
+            DownloadManager.STATUS_PAUSED -> {
+              state = "paused"
+              reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+            }
             else -> state = "downloading"
           }
         } else {
           prefs().edit().remove("downloadId").apply()
         }
       }
+    }
+    if (state == "missing" && !directActive && prefs().getLong("downloadId", -1L) < 0 && partFile().exists()) {
+      received = partFile().length() // téléchargement direct interrompu : reprise possible
     }
     out.put("state", state)
     out.put("received", received)
@@ -98,6 +126,9 @@ class LocalLlmPlugin : Plugin() {
     out.put("loaded", engine != null)
     out.put("backend", backendName)
     out.put("freeBytes", modelDir().usableSpace)
+    out.put("reason", reason)
+    out.put("mobileData", prefs().getBoolean("mobileData", false))
+    out.put("mode", if (directActive) "direct" else if (id >= 0) "manager" else "")
     if (error.isNotEmpty()) out.put("error", error)
     call.resolve(out)
   }
@@ -106,21 +137,119 @@ class LocalLlmPlugin : Plugin() {
   fun download(call: PluginCall) {
     if (modelFile().exists()) { call.resolve(JSObject().put("state", "ready")); return }
     if (prefs().getLong("downloadId", -1L) >= 0) { call.resolve(JSObject().put("state", "downloading")); return }
+    if (directActive) { call.resolve(JSObject().put("state", "downloading")); return }
+    val mobile = call.getBoolean("allowMobileData", false) ?: false
     partFile().delete()
     val req = DownloadManager.Request(Uri.parse(call.getString("url") ?: MODEL_URL))
       .setTitle("Kairo · modèle d’IA")
       .setDescription("Gemma 4 E2B (2,6 Go)")
       .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-      .setAllowedOverMetered(call.getBoolean("allowMobileData", false) ?: false)
+      .setAllowedNetworkTypes(
+        if (mobile) DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
+        else DownloadManager.Request.NETWORK_WIFI
+      )
+      .setAllowedOverMetered(mobile)
       .setAllowedOverRoaming(false)
       .setDestinationUri(Uri.fromFile(partFile()))
     val id = dm().enqueue(req)
-    prefs().edit().putLong("downloadId", id).apply()
+    prefs().edit().putLong("downloadId", id).putBoolean("mobileData", mobile).apply()
     call.resolve(JSObject().put("state", "downloading"))
+  }
+
+  /** Téléchargement direct par l'app (Wi-Fi ou 4G), reprend là où il s'était arrêté. */
+  @PluginMethod
+  fun downloadDirect(call: PluginCall) {
+    if (modelFile().exists()) { call.resolve(JSObject().put("state", "ready")); return }
+    if (directActive) { call.resolve(JSObject().put("state", "downloading")); return }
+    // Arrête un éventuel téléchargement du gestionnaire Android.
+    val id = prefs().getLong("downloadId", -1L)
+    if (id >= 0) { dm().remove(id); prefs().edit().remove("downloadId").apply(); partFile().delete() }
+    prefs().edit().putBoolean("mobileData", true).apply()
+    val url = call.getString("url") ?: MODEL_URL
+    directStop = false
+    directError = ""
+    directActive = true
+    directReceived = partFile().length()
+    directTotal = 0L
+    directThread = Thread {
+      val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+      val lock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "kairo:model-download")
+      lock.acquire(3 * 60 * 60 * 1000L)
+      try {
+        var attempt = 0
+        while (true) {
+          try {
+            directOnce(url)
+            break
+          } catch (t: Throwable) {
+            if (directStop) throw t
+            attempt++
+            if (attempt > 5) throw t
+            Thread.sleep(3000L * attempt) // coupure réseau : on réessaie en reprenant
+          }
+        }
+        if (!directStop) {
+          if (!partFile().renameTo(modelFile())) throw IllegalStateException("Impossible de finaliser le fichier.")
+        }
+      } catch (t: Throwable) {
+        if (!directStop) directError = "Téléchargement interrompu : ${t.message ?: "erreur réseau"}. Relance pour reprendre où il s’est arrêté."
+      } finally {
+        directActive = false
+        if (lock.isHeld) lock.release()
+      }
+    }.apply { isDaemon = true; start() }
+    call.resolve(JSObject().put("state", "downloading"))
+  }
+
+  private fun directOnce(url: String) {
+    val part = partFile()
+    val start = if (part.exists()) part.length() else 0L
+    var conn = URL(url).openConnection() as HttpURLConnection
+    conn.instanceFollowRedirects = true
+    conn.connectTimeout = 20000
+    conn.readTimeout = 60000
+    if (start > 0) conn.setRequestProperty("Range", "bytes=$start-")
+    var code = conn.responseCode
+    // Suit manuellement les redirections entre domaines (Hugging Face → CDN).
+    var hops = 0
+    while (code in 300..399 && hops < 5) {
+      val loc = conn.getHeaderField("Location") ?: break
+      conn.disconnect()
+      conn = URL(URL(url), loc).openConnection() as HttpURLConnection
+      conn.connectTimeout = 20000
+      conn.readTimeout = 60000
+      if (start > 0) conn.setRequestProperty("Range", "bytes=$start-")
+      code = conn.responseCode
+      hops++
+    }
+    if (code == 416) return // déjà complet
+    if (code !in 200..299) throw IllegalStateException("HTTP $code")
+    val append = code == 206 && start > 0
+    if (!append) part.delete()
+    val len = conn.contentLengthLong
+    directTotal = if (len > 0) (if (append) start + len else len) else 0L
+    directReceived = if (append) start else 0L
+    conn.inputStream.use { input ->
+      FileOutputStream(part, append).use { out ->
+        val buf = ByteArray(256 * 1024)
+        while (true) {
+          if (directStop) throw InterruptedException("annulé")
+          val n = input.read(buf)
+          if (n < 0) break
+          out.write(buf, 0, n)
+          directReceived += n
+        }
+      }
+    }
+    conn.disconnect()
+    if (directTotal > 0 && part.length() < directTotal) throw IllegalStateException("fichier incomplet")
   }
 
   @PluginMethod
   fun cancelDownload(call: PluginCall) {
+    directStop = true
+    directThread?.join(3000)
+    directActive = false
     val id = prefs().getLong("downloadId", -1L)
     if (id >= 0) dm().remove(id)
     prefs().edit().remove("downloadId").apply()

@@ -10,12 +10,17 @@ export interface ModelStatus {
   loaded: boolean;
   backend: string;
   freeBytes: number;
+  /** Raison de la pause (gestionnaire Android) : 2 = attente réseau, 3 = attente Wi-Fi. */
+  reason: number;
+  mobileData: boolean;
+  mode: 'direct' | 'manager' | '';
   error?: string;
 }
 
 interface LocalLlmPlugin {
   status(): Promise<ModelStatus>;
   download(o: { allowMobileData?: boolean; url?: string }): Promise<{ state: string }>;
+  downloadDirect(o?: { url?: string }): Promise<{ state: string }>;
   cancelDownload(): Promise<void>;
   deleteModel(): Promise<void>;
   load(): Promise<{ backend: string }>;

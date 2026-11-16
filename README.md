@@ -79,21 +79,19 @@ Après chaque modification du code : relance `npm run android`.
 
 ## 4. Accès Internet de l'IA
 
-1. Crée un compte gratuit sur **ollama.com**, puis Settings → **Keys** → crée une clé.
-2. Dans l'app : Réglages → Internet → colle la clé → « Tester la recherche ».
-
-L'IA décide seule quand chercher (ou quand tu lui demandes). Seule la requête de
-recherche passe par Ollama ; tes notes et habitudes restent sur ton appareil.
+Rien à configurer : l'IA cherche avec **DuckDuckGo** (gratuit, sans compte ni clé)
+et lit les pages directement. Seule la requête de recherche sort de ton appareil.
 Le bouton **WEB ON/OFF** en haut du chat coupe l'accès à tout moment.
 
-## 5. (Expérimental) IA directement sur le téléphone
+(Avancé : si ton offre Ollama inclut la recherche web, tu peux mettre ta clé dans
+Réglages → Internet → Avancé ; DuckDuckGo reste le repli.)
 
-Sans Mac, hors ligne : Réglages → « Sur le téléphone ».
-Il faut un téléphone récent (WebGPU, 8 Go de RAM conseillés) et un modèle
-**Gemma 3n E2B « -Web »** au format `.litertlm` (~3 Go), à télécharger depuis
-Hugging Face (repo `google/gemma-3n-E2B-it-litert-lm`, accepte la licence Gemma),
-à copier sur le téléphone puis à importer dans l'app. Plus lent et moins fort
-qu'Ollama sur le Mac.
+## 5. IA directement sur le téléphone (Android)
+
+Sans Mac, hors ligne : Réglages → « Sur le téléphone » → **Télécharger le modèle**
+(Gemma 4 E2B, ~2,6 Go, une seule fois). En 4G/5G, garde l'app ouverte : si ça coupe,
+le téléchargement reprend où il s'était arrêté. En Wi-Fi, il continue même app fermée.
+Puis « Charger maintenant » (10–20 s la première fois).
 
 ## Les états de l’IA (loaders)
 
