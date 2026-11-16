@@ -93,6 +93,17 @@ Sans Mac, hors ligne : Réglages → « Sur le téléphone » → **Télécharge
 le téléchargement reprend où il s'était arrêté. En Wi-Fi, il continue même app fermée.
 Puis « Charger maintenant » (10–20 s la première fois).
 
+## Itinéraire (onglet carte)
+
+Calcul d'itinéraire en voiture avec **visualisation de Dijkstra ou A\*** puis guidage GPS vocal.
+100 % gratuit, sans clé : carte OpenFreeMap (MapLibre), adresses Photon, routes Overpass (OpenStreetMap).
+
+- Tape le départ et l'arrivée (suggestions pendant la frappe), ou « Ma position », ou appui long sur la carte.
+- Choisis l'algorithme et la durée de l'animation, puis « Calculer l'itinéraire » (« Passer l'animation » pour aller au résultat).
+- « Démarrer » : la carte suit ta position, annonces vocales à 500 / 200 / 50 m, recalcul automatique si tu sors de la route.
+- Jusqu'à 50 km à vol d'oiseau : toutes les rues autour du départ et de l'arrivée, grands axes entre les deux.
+- Nécessite Internet (carte, adresses, routes). Garde l'écran allumé pendant le guidage (l'app le fait pour toi).
+
 ## Les états de l’IA (loaders)
 
 | État | Quand |

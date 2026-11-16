@@ -10,7 +10,11 @@ function webProxy(): Plugin {
     const target = new URL(req.url, 'http://x').searchParams.get('url') || '';
     if (!/^https?:\/\//.test(target)) { res.statusCode = 400; return res.end('url invalide'); }
     try {
-      const r = await fetch(target, { headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36', 'Accept-Language': 'fr-FR,fr;q=0.9' }, redirect: 'follow' });
+      const kairo = new URL(req.url, 'http://x').searchParams.get('ua') === 'kairo';
+      const ua = kairo
+        ? 'Kairo/1.0 (app de notes et navigation; https://github.com/SAD3S/Kairo)'
+        : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
+      const r = await fetch(target, { headers: { 'User-Agent': ua, 'Accept-Language': 'fr-FR,fr;q=0.9' }, redirect: 'follow' });
       res.statusCode = r.status;
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.end(await r.text());

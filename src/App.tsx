@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
@@ -12,6 +12,9 @@ import { Camera } from './screens/Camera';
 import { Notes } from './screens/Notes';
 import { NoteEditor } from './screens/NoteEditor';
 import { Settings } from './screens/Settings';
+
+// La carte (MapLibre) est chargée seulement à l'ouverture de l'écran Itinéraire.
+const RouteScreen = lazy(() => import('./features/route/RouteScreen').then((m) => ({ default: m.RouteScreen })));
 
 export function App() {
   const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
@@ -46,6 +49,7 @@ export function App() {
     case 'notes': screen = <Notes />; break;
     case 'note': screen = <NoteEditor id={route.id} />; break;
     case 'settings': screen = <Settings />; break;
+    case 'route': screen = <Suspense fallback={<div className="screen" />}><RouteScreen /></Suspense>; break;
     default: screen = <Home />;
   }
 

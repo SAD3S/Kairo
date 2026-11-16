@@ -34,6 +34,11 @@ const P: Record<string, React.ReactElement> = {
   listBullet: (<><circle cx="5" cy="7" r="1.2" /><circle cx="5" cy="12" r="1.2" /><circle cx="5" cy="17" r="1.2" /><path d="M9.5 7H20M9.5 12H20M9.5 17H20" /></>),
   listNum: (<><path d="M4 5.5h1.5v4M4 9.5h3M4 14.5c0-1 .8-1.5 1.5-1.5s1.5.5 1.5 1.3c0 1.2-3 2-3 3.7h3M10.5 7H20M10.5 12H20M10.5 17H20" /></>),
   palette: (<><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.2 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7h2a4 4 0 0 0 4-4c0-4-3.8-7.2-8.5-7.2z" /><circle cx="7.5" cy="12" r="1.1" /><circle cx="9.5" cy="8" r="1.1" /><circle cx="14" cy="7.5" r="1.1" /></>),
+  map: <path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5zM9 4v13.5M15 6.5V20" />,
+  route: (<><circle cx="6" cy="18" r="2.2" /><circle cx="18" cy="6" r="2.2" /><path d="M8.2 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.8" /></>),
+  locate: (<><circle cx="12" cy="12" r="3.5" /><circle cx="12" cy="12" r="7.5" /><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22" /></>),
+  swap: <path d="M7 4v16M3.5 16.5L7 20l3.5-3.5M17 20V4M13.5 7.5L17 4l3.5 3.5" />,
+  nav: <path d="M12 3l7 18-7-4-7 4z" />,
   flash: <path d="M13 3L5 13h6l-1 8 8-10h-6z" />,
   // Icônes d'habitudes
   sport: <path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11" />,

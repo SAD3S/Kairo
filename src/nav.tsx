@@ -8,7 +8,8 @@ export type Route =
   | { name: 'camera' }
   | { name: 'notes' }
   | { name: 'note'; id: string }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'route' };
 
 export interface Nav {
   route: Route;
