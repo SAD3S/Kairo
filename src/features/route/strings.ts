@@ -37,6 +37,9 @@ export const T = {
   noRoads: 'Aucune route carrossable trouvée dans cette zone.',
   noPath: 'Aucun chemin en voiture entre ces deux points (sens uniques, zone isolée ?).',
   tooFarFromRoad: (m: number) => `Le point est à ${m} m de la route la plus proche.`,
+  loadingPack: 'Chargement des routes hors ligne',
+  offlineTag: 'HORS LIGNE',
+  packHint: 'Télécharger l’Île-de-France pour aller plus vite et sans réseau',
   offline: 'Pas de connexion : la carte et le calcul d’itinéraire ont besoin d’Internet.',
   // GPS
   gpsDenied: 'Kairo n’a pas accès à ta position. Autorise la localisation dans les réglages du téléphone (Applications → Kairo → Autorisations).',

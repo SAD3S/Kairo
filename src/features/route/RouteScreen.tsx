@@ -5,7 +5,13 @@ import { Loader } from '../../components/Loader';
 import { bearing, dist, formatDistance, formatDuration, LatLon } from './geo';
 import { maneuverText, ManeuverType, RoutePlan } from './instructions';
 import { fetchRoads, Place, RouteError } from './repo';
-import { RouteEngine, OutsideError } from './engine';
+import { OutsideError, sharedEngine } from './engine';
+import type { GraphSlot } from './protocol';
+import { insidePack } from './pack';
+import { installedManifest, isComplete, loadPackGraph, loadPackIndex, Manifest, OfflinePack, offlineStyle, packSupported } from './packStore';
+import { MAP_STYLE } from './useMap';
+import { useStore } from '../../lib/store';
+import { useNav } from '../../nav';
 import { Algo } from './search';
 import { T } from './strings';
 import { NavTracker, NavUpdate } from './tracker';
@@ -52,9 +58,17 @@ export function RouteScreen() {
   const [navMsg, setNavMsg] = useState('');
   const [rerouting, setRerouting] = useState(false);
 
-  const engine = useMemo(() => new RouteEngine(), []);
+  const engine = useMemo(() => sharedEngine(), []);
+  const nav0 = useNav();
+  const offlineMapPref = useStore((s) => s.settings.offlineMap);
+  // Pack hors ligne : connu immédiatement (localStorage), vérifié ensuite sur le disque.
+  const [pack, setPack] = useState<Manifest | null>(() => (packSupported() ? installedManifest() : null));
+  const [packChecked, setPackChecked] = useState(false);
+  const mapStyle = useMemo(() => (pack && offlineMapPref ? offlineStyle(pack) : MAP_STYLE), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [slotUsed, setSlotUsed] = useState<GraphSlot>('live');
   const graphKey = useRef('');
   const graphNodes = useRef(0);
+  const packNodes = useRef(0);
   const lastFix = useRef<LatLon | null>(null);
   const abort = useRef<AbortController | null>(null);
   const stopWatch = useRef<(() => void) | null>(null);
@@ -63,15 +77,28 @@ export function RouteScreen() {
   const reroutingRef = useRef(false);
   const heading = useRef(0);
 
-  const map = useMap(mapBox, (p) => { if (phase !== 'nav') setPressed(p); });
+  const map = useMap(mapBox, mapStyle, (p) => { if (phase !== 'nav') setPressed(p); });
+
+  useEffect(() => {
+    if (!packSupported()) return setPackChecked(true);
+    OfflinePack.status({ id: 'idf' })
+      .then((st) => {
+        const m = installedManifest();
+        setPack(isComplete(m, st) ? m : null);
+      })
+      .catch(() => setPack(null))
+      .finally(() => setPackChecked(true));
+  }, []);
+
+  const canUsePack = (p: LatLon, q: LatLon) => !!pack && insidePack(p, pack.bbox) && insidePack(q, pack.bbox);
+  const offlineSearch = pack ? async (q: string, bias0: LatLon | null) => (await loadPackIndex(pack)).search(q, bias0) : undefined;
 
   useEffect(() => () => {
     abort.current?.abort();
     stopWatch.current?.();
     keepScreenOn(false);
     stopSpeaking();
-    engine.dispose();
-  }, [engine]);
+  }, []);
 
   // Marqueurs A et B.
   useEffect(() => { if (map.ready) map.setPoint('A', a, !!a && !b); }, [a, map.ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -104,23 +131,35 @@ export function RouteScreen() {
 
   const keyOf = (p: LatLon, q: LatLon) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}|${q.lat.toFixed(4)},${q.lon.toFixed(4)}`;
 
-  /** Télécharge les routes et construit le graphe (si A/B ont changé). */
-  const ensureGraph = async (from: LatLon, to: LatLon, signal: AbortSignal) => {
+  /** Prépare le graphe : celui du pack hors ligne si A et B y sont, sinon téléchargement Overpass. */
+  const ensureGraph = async (from: LatLon, to: LatLon, signal: AbortSignal): Promise<GraphSlot> => {
+    if (canUsePack(from, to) && pack) {
+      if (!engine.ready.pack) {
+        setStatus({ s: 'data', label: T.loadingPack, sub: 'une seule fois par session' });
+        const buf = await loadPackGraph(pack, (r) => setStatus({ s: 'data', label: T.loadingPack, sub: `${Math.round(r * 100)} %` }));
+        setStatus({ s: 'think', label: T.buildingGraph });
+        const g = await engine.loadPackGraph(buf);
+        packNodes.current = g.nodes;
+      }
+      return 'pack';
+    }
+    if (!navigator.onLine) throw new RouteError(T.offline);
     const key = keyOf(from, to);
-    if (graphKey.current === key && engine.graphReady) return;
+    if (graphKey.current === key && engine.ready.live) return 'live';
     setStatus({ s: 'web', label: T.loadingGraph, sub: `${formatDistance(dist(from, to))} à vol d’oiseau` });
     const json = await fetchRoads(from, to, signal);
     setStatus({ s: 'think', label: T.buildingGraph, sub: `${(json.length / 1e6).toFixed(1).replace('.', ',')} Mo` });
     const g = await engine.loadGraph(json);
     graphKey.current = key;
     graphNodes.current = g.nodes;
+    return 'live';
   };
 
   const compute = async () => {
     setErr('');
     setPressed(null);
     if (!a || !b) return setErr(T.needBoth);
-    if (!navigator.onLine) return setErr(T.offline);
+    if (!navigator.onLine && !canUsePack(a, b)) return setErr(T.offline);
     abort.current?.abort();
     const ctrl = new AbortController();
     abort.current = ctrl;
@@ -129,17 +168,18 @@ export function RouteScreen() {
     setPlan(null);
     setPhase('loading');
     try {
-      await ensureGraph(a, b, ctrl.signal);
+      const slot = await ensureGraph(a, b, ctrl.signal);
+      setSlotUsed(slot);
       setPhase('animating');
       setStatus({ s: 'think', label: T.exploring, sub: algo === 'astar' ? 'A*' : 'Dijkstra' });
       map.fit([[a.lon, a.lat], [b.lon, b.lat]]);
-      const r = await engine.run(algo, a, b, DURATIONS[speedIdx], (lines) => map.addExplored(lines));
+      const r = await engine.run(algo, a, b, DURATIONS[speedIdx], slot, (lines) => map.addExplored(lines));
       map.clearExplored();
       map.setRoute(r.plan.coords);
       map.fit(r.plan.coords);
       setPlan(r.plan);
       planRef.current = r.plan;
-      setStats({ visited: r.visited, algo, nodes: graphNodes.current });
+      setStats({ visited: r.visited, algo, nodes: slot === 'pack' ? packNodes.current : graphNodes.current });
       setPhase('result');
     } catch (e: any) {
       if (e?.name === 'AbortError') return;
@@ -154,18 +194,19 @@ export function RouteScreen() {
     if (reroutingRef.current || !b) return;
     reroutingRef.current = true;
     setRerouting(true);
-    const run = () => engine.run(algo, from, b, 0);
     try {
       let r;
+      const ctrl = new AbortController();
+      abort.current = ctrl;
+      let slot = canUsePack(from, b) ? await ensureGraph(from, b, ctrl.signal) : slotUsed;
       try {
-        r = await run();
+        r = await engine.run(algo, from, b, 0, slot);
       } catch (e) {
         if (!(e instanceof OutsideError)) throw e;
-        // Hors de la zone téléchargée : on recharge les routes depuis la position actuelle.
-        const ctrl = new AbortController();
-        abort.current = ctrl;
-        await ensureGraph(from, b, ctrl.signal);
-        r = await run();
+        // Hors de la zone chargée : on recharge les routes depuis la position actuelle.
+        graphKey.current = '';
+        slot = await ensureGraph(from, b, ctrl.signal);
+        r = await engine.run(algo, from, b, 0, slot);
       }
       planRef.current = r.plan;
       setPlan(r.plan);
@@ -250,6 +291,7 @@ export function RouteScreen() {
               onBlur={() => setFocus((f) => (f === 'A' ? null : f))}
               onPick={(p) => { setA(p); resetRoute(); setFocus(null); }}
               onClear={() => { setA(null); resetRoute(); }}
+              offline={offlineSearch}
               right={
                 <button className="icon-btn ghost" aria-label={T.myPosition} disabled={locating} onClick={useMyPosition} style={{ color: 'var(--a)' }}>
                   {locating ? <Loader status="think" /> : <Icon name="locate" size={19} />}
@@ -267,6 +309,7 @@ export function RouteScreen() {
               onBlur={() => setFocus((f) => (f === 'B' ? null : f))}
               onPick={(p) => { setB(p); resetRoute(); setFocus(null); }}
               onClear={() => { setB(null); resetRoute(); }}
+              offline={offlineSearch}
               right={
                 <button className="icon-btn ghost" aria-label={T.swap} onClick={() => { const x = a; setA(b); setB(x); resetRoute(); }}>
                   <Icon name="swap" size={19} />
@@ -312,7 +355,7 @@ export function RouteScreen() {
                     <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.5 }}>{formatDuration(plan.time)}</span>
                     <span style={{ fontSize: 16, color: 'var(--muted)' }}>{formatDistance(plan.distance)}</span>
                   </div>
-                  {stats && <span className="label" style={{ fontSize: 10 }}>{stats.algo === 'astar' ? 'A*' : 'Dijkstra'} · {T.visited(stats.visited)} / {stats.nodes.toLocaleString('fr-FR')}</span>}
+                  {stats && <span className="label" style={{ fontSize: 10 }}>{slotUsed === 'pack' ? `${T.offlineTag} · ` : ''}{stats.algo === 'astar' ? 'A*' : 'Dijkstra'} · {T.visited(stats.visited)} / {stats.nodes.toLocaleString('fr-FR')}</span>}
                   <div className="row" style={{ gap: 8 }}>
                     <button className="btn" onClick={() => { resetRoute(); setPhase('idle'); }} aria-label="Modifier"><Icon name="back" size={16} /></button>
                     <button className="btn" style={{ flex: 1 }} onClick={() => { setAlgo(algo === 'astar' ? 'dijkstra' : 'astar'); setPhase('idle'); map.setRoute(null); }}>Comparer avec {algo === 'astar' ? 'Dijkstra' : 'A*'}</button>
@@ -333,6 +376,11 @@ export function RouteScreen() {
                     <input type="range" min={0} max={4} step={1} value={speedIdx} onChange={(e) => setSpeedIdx(+e.target.value)} className="range" aria-label={T.speed} />
                   </label>
                   <button className="btn primary" onClick={compute} disabled={!a || !b}><Icon name="route" size={16} />{T.compute}</button>
+                  {pack ? (
+                    <span className="label" style={{ fontSize: 10, textAlign: 'center', color: 'var(--a-soft)' }}>{T.offlineTag} · {pack.name.toUpperCase()} · {pack.version}</span>
+                  ) : packSupported() && packChecked ? (
+                    <button className="tag" style={{ alignSelf: 'center', padding: '6px 10px' }} onClick={() => nav0.go({ name: 'settings' })}>{T.packHint}</button>
+                  ) : null}
                 </>
               )}
               {err && <p className="err" style={{ margin: 0 }}>{err}</p>}

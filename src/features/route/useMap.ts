@@ -35,7 +35,7 @@ export interface MapApi {
   fit(points: [number, number][], padding?: PaddingOptions): void;
 }
 
-export function useMap(container: React.RefObject<HTMLDivElement | null>, onLongPress: (p: LatLon) => void): MapApi {
+export function useMap(container: React.RefObject<HTMLDivElement | null>, style: string | object, onLongPress: (p: LatLon) => void): MapApi {
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
   const explored = useRef<[number, number][][]>([]);
@@ -48,7 +48,7 @@ export function useMap(container: React.RefObject<HTMLDivElement | null>, onLong
     if (!container.current) return;
     const map = new MlMap({
       container: container.current,
-      style: MAP_STYLE,
+      style: style as any,
       center: [2.3488, 48.8534],
       zoom: 11,
       attributionControl: { compact: true },

@@ -102,7 +102,14 @@ Calcul d'itinéraire en voiture avec **visualisation de Dijkstra ou A\*** puis g
 - Choisis l'algorithme et la durée de l'animation, puis « Calculer l'itinéraire » (« Passer l'animation » pour aller au résultat).
 - « Démarrer » : la carte suit ta position, annonces vocales à 500 / 200 / 50 m, recalcul automatique si tu sors de la route.
 - Jusqu'à 50 km à vol d'oiseau : toutes les rues autour du départ et de l'arrivée, grands axes entre les deux.
-- Nécessite Internet (carte, adresses, routes). Garde l'écran allumé pendant le guidage (l'app le fait pour toi).
+- Sans pack : nécessite Internet (carte, adresses, routes).
+
+### Pack hors ligne Île-de-France
+
+Réglages → **Cartes hors ligne** → Télécharger. Ensuite, dans toute l'Île-de-France (Paris + 7 départements) :
+itinéraires instantanés sans Overpass, carte sombre et recherche (communes, gares, lieux connus, rues) **sans réseau**.
+Le pack est fabriqué chaque mois par GitHub Actions (`.github/workflows/pack.yml`, données © OpenStreetMap,
+carte Protomaps) et publié dans la release `pack-idf`.
 
 ## Les états de l’IA (loaders)
 

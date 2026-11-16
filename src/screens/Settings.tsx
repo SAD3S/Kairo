@@ -11,6 +11,10 @@ import { webSearch } from '../lib/ai/web';
 import { AiError } from '../lib/ai/types';
 import { isNativeAndroid } from '../lib/ai/native';
 import { NativeModelPanel } from '../components/NativeModelPanel';
+import { lazy, Suspense } from 'react';
+
+// Chargé à la demande (dépend de la bibliothèque de carte).
+const OfflinePackPanel = lazy(() => import('../features/route/OfflinePackPanel').then((m) => ({ default: m.OfflinePackPanel })));
 
 const ACCENTS = ['#8B8CF8', '#6FCFE0', '#E9A15B', '#7BD88F', '#E58FD0'];
 
@@ -197,6 +201,12 @@ export function Settings() {
             </label>
           </details>
           {webTest && <p className={webTest.ok ? '' : 'err'} style={{ margin: 0, fontSize: 13, color: webTest.ok ? '#7bd88f' : undefined }}>{webTest.text}</p>}
+        </Section>
+
+        <Section title="Cartes hors ligne">
+          <Suspense fallback={<span className="muted">…</span>}>
+            <OfflinePackPanel />
+          </Suspense>
         </Section>
 
         <Section title="Apparence">

@@ -1,13 +1,14 @@
 /// <reference lib="webworker" />
 // Calculs lourds hors du fil de l'interface (équivalent de Dispatchers.Default) :
 // construction du graphe, recherche animée par lots, itinéraire final.
-import { LatLon } from './geo';
+import { haversine, LatLon } from './geo';
 import { buildGraph, edgeCoords, Graph, nearestNode } from './graph';
+import { decodeGraph } from './pack';
 import { buildRoute } from './instructions';
 import { Algo, shortestPath } from './search';
-import type { WorkerIn, WorkerOut } from './protocol';
+import type { GraphSlot, WorkerIn, WorkerOut } from './protocol';
 
-let graph: Graph | null = null;
+const graphs: Record<GraphSlot, Graph | null> = { live: null, pack: null };
 let skip = false;
 let runId = 0;
 
@@ -16,8 +17,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Au-delà de cette distance, le point est jugé hors de la zone téléchargée. */
 const SNAP_MAX = 400;
 
-async function run(id: number, algo: Algo, a: LatLon, b: LatLon, durationMs: number) {
-  const g = graph;
+/** Estime le nombre de nœuds que l'algorithme va visiter (pour régler la vitesse de l'animation). */
+function estimateVisits(g: Graph, a: LatLon, b: LatLon, algo: Algo): number {
+  const d = haversine(a.lat, a.lon, b.lat, b.lon);
+  let n = 0;
+  for (let i = 0; i < g.nodeCount; i++) {
+    const da = haversine(a.lat, a.lon, g.lat[i], g.lon[i]);
+    if (algo === 'dijkstra') { if (da <= d) n++; }
+    else if (da + haversine(g.lat[i], g.lon[i], b.lat, b.lon) <= d * 1.25) n++;
+  }
+  return Math.max(50, n);
+}
+
+async function run(id: number, algo: Algo, a: LatLon, b: LatLon, durationMs: number, slot: GraphSlot) {
+  const g = graphs[slot];
   if (!g) return post({ type: 'error', id, code: 'nograph' });
   const sa = nearestNode(g, a, 'out');
   const sb = nearestNode(g, b, 'in');
@@ -28,7 +41,7 @@ async function run(id: number, algo: Algo, a: LatLon, b: LatLon, durationMs: num
   // Durée cible quelle que soit la taille du graphe : ~30 images/s, lot ajusté à l'estimation.
   const FRAME = 33;
   const frames = Math.max(1, durationMs / FRAME);
-  const estimate = algo === 'astar' ? g.nodeCount * 0.3 : g.nodeCount * 0.6;
+  const estimate = skip ? 0 : estimateVisits(g, a, b, algo);
   const batch = skip ? 1e9 : Math.max(1, Math.ceil(estimate / frames));
   const it = shortestPath(g, sa.node, sb.node, algo, batch);
   let last = performance.now();
@@ -56,19 +69,27 @@ self.onmessage = (ev: MessageEvent<WorkerIn>) => {
   if (m.type === 'graph') {
     try {
       post({ type: 'progress', step: 'build' });
-      graph = buildGraph(JSON.parse(m.json));
-      if (!graph.edgeCount) {
-        graph = null;
-        return post({ type: 'error', id: 0, code: 'noroads' });
-      }
-      post({ type: 'graph-ready', nodes: graph.nodeCount, edges: graph.edgeCount });
+      const g = buildGraph(JSON.parse(m.json));
+      graphs.live = g.edgeCount ? g : null;
+      if (!graphs.live) return post({ type: 'error', id: 0, code: 'noroads' });
+      post({ type: 'graph-ready', nodes: g.nodeCount, edges: g.edgeCount, slot: 'live' });
     } catch {
-      graph = null;
+      graphs.live = null;
+      post({ type: 'error', id: 0, code: 'parse' });
+    }
+  } else if (m.type === 'graph-bin') {
+    try {
+      post({ type: 'progress', step: 'build' });
+      const g = decodeGraph(m.buf);
+      graphs.pack = g;
+      post({ type: 'graph-ready', nodes: g.nodeCount, edges: g.edgeCount, slot: 'pack' });
+    } catch {
+      graphs.pack = null;
       post({ type: 'error', id: 0, code: 'parse' });
     }
   } else if (m.type === 'run') {
     runId = m.id;
-    run(m.id, m.algo, m.a, m.b, m.durationMs);
+    run(m.id, m.algo, m.a, m.b, m.durationMs, m.slot);
   } else if (m.type === 'skip') {
     skip = true;
   }

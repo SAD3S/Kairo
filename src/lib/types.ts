@@ -64,6 +64,8 @@ export interface Settings {
   /** Nom du fichier du modèle importé sur l'appareil. */
   deviceModelName: string;
   accent: string;
+  /** Utiliser la carte du pack hors ligne quand il est installé. */
+  offlineMap: boolean;
 }
 
 export interface AppData {
@@ -83,4 +85,5 @@ export const DEFAULT_SETTINGS: Settings = {
   ollamaApiKey: '',
   deviceModelName: '',
   accent: '#8B8CF8',
+  offlineMap: true,
 };

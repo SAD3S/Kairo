@@ -15,6 +15,7 @@ export function PlaceInput({
   focused,
   onFocus,
   onBlur,
+  offline,
 }: {
   label: string;
   dot: 'A' | 'B';
@@ -26,6 +27,8 @@ export function PlaceInput({
   focused: boolean;
   onFocus: () => void;
   onBlur: () => void;
+  /** Recherche dans l'index hors ligne (si le pack est installé). */
+  offline?: (q: string, bias: LatLon | null) => Promise<Place[]>;
 }) {
   const [text, setText] = useState(value?.name ?? '');
   const [items, setItems] = useState<Place[]>([]);
@@ -52,12 +55,20 @@ export function PlaceInput({
     const ctrl = new AbortController();
     const t = window.setTimeout(async () => {
       setState('loading');
+      const local = async () => (offline ? offline(q, bias()) : []);
       try {
-        const r = await photonSearch(q, bias(), ctrl.signal);
+        // Hors connexion : directement l'index du pack. Sinon Photon, avec l'index en secours.
+        let r = navigator.onLine ? await photonSearch(q, bias(), ctrl.signal) : await local();
+        if (!r.length && navigator.onLine) r = await local();
+        if (ctrl.signal.aborted) return;
         setItems(r);
         setState(r.length ? 'idle' : 'empty');
       } catch (e: any) {
         if (e?.name === 'AbortError') return;
+        try {
+          const r = await local();
+          if (r.length) { setItems(r); setState('idle'); return; }
+        } catch { /* index indisponible */ }
         setErr(e instanceof RouteError ? e.message : T.photonError);
         setState('error');
       }

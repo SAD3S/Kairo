@@ -56,21 +56,21 @@ export function isDrivable(tags: Record<string, string> | undefined): boolean {
 
 export interface Graph {
   /** Coordonnées des nœuds : lat[i], lon[i]. */
-  lat: Float64Array;
-  lon: Float64Array;
+  lat: Float64Array | Float32Array;
+  lon: Float64Array | Float32Array;
   /** Liste d'adjacence compacte (CSR) : arêtes sortantes de i = [first[i], first[i+1]). */
   first: Int32Array;
   to: Int32Array;
   from: Int32Array;
   /** Coût en secondes, longueur en mètres. */
-  cost: Float64Array;
-  length: Float64Array;
+  cost: Float64Array | Float32Array;
+  length: Float64Array | Float32Array;
   /** Index du nom de rue dans `names` (-1 si aucun). */
   name: Int32Array;
   names: string[];
   /** Géométrie : points de l'arête e = geo[geoStart[e]*2 … geoStart[e+1]*2) en paires lon,lat. */
   geoStart: Int32Array;
-  geo: Float64Array;
+  geo: Float64Array | Float32Array;
   /** Vitesse max du graphe (m/s), pour l'heuristique A*. */
   vmax: number;
   nodeCount: number;
