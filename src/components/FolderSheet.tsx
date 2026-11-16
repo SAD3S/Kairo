@@ -3,7 +3,7 @@ import { createFolder, useStore } from '../lib/store';
 import { Icon } from './Icon';
 
 /** Feuille du bas : choisir un dossier existant ou en créer un nouveau. */
-export function FolderSheet({ currentId, onPick, onClose }: { currentId?: string; onPick: (id: string | undefined) => void; onClose: () => void }) {
+export function FolderSheet({ currentId, onPick, onClose, title = 'Ranger dans un dossier', noneLabel = 'Aucun dossier' }: { currentId?: string; onPick: (id: string | undefined) => void; onClose: () => void; title?: string; noneLabel?: string }) {
   const folders = useStore((s) => s.folders);
   const notes = useStore((s) => s.notes);
   const [name, setName] = useState('');
@@ -26,14 +26,14 @@ export function FolderSheet({ currentId, onPick, onClose }: { currentId?: string
 
   return (
     <div className="sheet-back" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-label="Ranger dans un dossier" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <span className="grip" />
-        <span style={{ fontSize: 17, fontWeight: 600 }}>Ranger dans un dossier</span>
+        <span style={{ fontSize: 17, fontWeight: 600 }}>{title}</span>
 
         <div className="scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '46vh' }}>
           <button style={row(!currentId)} onClick={() => pick(undefined)}>
             <span style={{ color: 'var(--dim)' }}><Icon name="note" size={18} /></span>
-            <span style={{ flex: 1 }}>Aucun dossier</span>
+            <span style={{ flex: 1 }}>{noneLabel}</span>
             {!currentId && <span style={{ color: 'var(--a)' }}><Icon name="check" size={18} stroke={2.2} /></span>}
           </button>
           {folders.map((f) => (

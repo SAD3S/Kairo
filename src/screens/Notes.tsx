@@ -5,7 +5,8 @@ import { useNav } from '../nav';
 import { relativeLabel } from '../lib/dates';
 import { scoreNote, words } from '../lib/ai/context';
 import { createFolder, deleteFolder, renameFolder, uid, upsertNote, useStore } from '../lib/store';
-import { FolderEditSheet } from '../components/FolderSheet';
+import { FolderEditSheet, FolderSheet } from '../components/FolderSheet';
+import { FolderChips } from '../components/FolderChips';
 import { Note } from '../lib/types';
 import { notePlain, taskCount } from '../lib/notes';
 
@@ -32,7 +33,7 @@ export function Notes() {
   const folders = useStore((s) => s.folders);
   const [q, setQ] = useState('');
   const [folderId, setFolderId] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<'new' | 'edit' | null>(null);
+  const [sheet, setSheet] = useState<'new' | 'edit' | 'all' | null>(null);
   const folder = folders.find((f) => f.id === folderId);
   const folderName = (id?: string) => folders.find((f) => f.id === id)?.name;
   const countIn = (id: string) => notes.filter((n) => n.folderId === id).length;
@@ -68,17 +69,7 @@ export function Notes() {
           {q && <button className="tag" onClick={() => setQ('')}>EFFACER</button>}
         </label>
 
-        <div className="scroll row" style={{ gap: 8, overflowX: 'auto', margin: '0 -16px', padding: '0 16px' }} role="tablist" aria-label="Dossiers">
-          <button role="tab" aria-selected={folderId === null} className={`chip ${folderId === null ? 'on' : ''}`} onClick={() => setFolderId(null)}>Toutes</button>
-          {folders.map((f) => (
-            <button key={f.id} role="tab" aria-selected={folderId === f.id} className={`chip ${folderId === f.id ? 'on' : ''}`} onClick={() => setFolderId(f.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Icon name="folder" size={14} />{f.name}<span style={{ opacity: 0.6, fontFamily: 'var(--mono)', fontSize: 11 }}>{countIn(f.id)}</span>
-            </button>
-          ))}
-          <button className="chip" aria-label="Nouveau dossier" onClick={() => setSheet('new')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Icon name="folderPlus" size={15} />{folders.length ? '' : 'Nouveau dossier'}
-          </button>
-        </div>
+        <FolderChips folders={folders} selected={folderId} count={countIn} onSelect={setFolderId} onMore={() => setSheet('all')} onNew={() => setSheet('new')} />
 
         {pinned.length > 0 && (
           <>
@@ -113,6 +104,9 @@ export function Notes() {
         ))}
         {list.length === 0 && <p className="muted" style={{ textAlign: 'center', marginTop: 30 }}>{q ? 'Aucune note trouvée.' : folder ? 'Ce dossier est vide. Touche + pour y écrire une note.' : 'Pas encore de note.'}</p>}
       </div>
+      {sheet === 'all' && (
+        <FolderSheet title="Dossiers" noneLabel="Toutes les notes" currentId={folderId ?? undefined} onPick={(id) => setFolderId(id ?? null)} onClose={() => setSheet(null)} />
+      )}
       {sheet === 'new' && <FolderEditSheet onSave={(name) => setFolderId(createFolder(name))} onClose={() => setSheet(null)} />}
       {sheet === 'edit' && folder && (
         <FolderEditSheet initial={folder.name} onSave={(name) => renameFolder(folder.id, name)} onDelete={() => { deleteFolder(folder.id); setFolderId(null); }} onClose={() => setSheet(null)} />

@@ -113,7 +113,7 @@ export function systemPrompt(context: string, web: boolean, focusTitle?: string)
   const tools = web
     ? `\n\nACCÈS INTERNET : si tu as besoin d'une information récente, d'un fait que tu ne connais pas avec certitude, ou si l'utilisateur te demande de chercher, réponds UNIQUEMENT avec une seule ligne :\n[[search: ta requête]]\nPour lire une page précise : [[fetch: https://adresse]]\nTu recevras le résultat, puis tu répondras normalement en citant les sources [1], [2]. N'utilise pas ces commandes pour des questions sur les notes ou les habitudes.`
     : '';
-  return `Tu es Kairo, l'assistant personnel intégré à l'application de l'utilisateur (habitudes + notes). Tu tournes en local. Réponds en français, de façon claire, chaleureuse et concise (Markdown léger autorisé : listes, gras). Quand l'utilisateur parle de ses habitudes ou de ses notes, appuie-toi sur les données ci-dessous et n'invente rien. Si une image est jointe, décris et explique précisément ce que tu vois.${focus}${notes}${tools}\n\n--- DONNÉES DE L'APP ---\n${context}`;
+  return `Tu es Kairo, l'assistant personnel intégré à l'application de l'utilisateur (habitudes + notes). Tu tournes en local. Réponds en français.\n\nSTYLE — TRÈS IMPORTANT :\n- Va droit au but : réponds directement à la question posée, dès la première phrase.\n- Pas d'introduction, pas de reformulation de la question, pas de conclusion ni de « n'hésite pas à… ».\n- Ne décris pas une image : sers-t'en seulement pour répondre. Ne la décris que si on te le demande explicitement.\n- Court par défaut (1 à 4 phrases). Une liste seulement si elle aide vraiment. Détaille uniquement si on te le demande.\n- Quand l'utilisateur parle de ses habitudes ou de ses notes, appuie-toi sur les données ci-dessous et n'invente rien.${focus}${notes}${tools}\n\n--- DONNÉES DE L'APP ---\n${context}`;
 }
 
 /** Trouve la note la plus proche d'un titre demandé par l'IA. */
@@ -135,7 +135,7 @@ export const REFORMAT_PROMPT = `Tu remets en forme des notes personnelles. Règl
 - Réponds UNIQUEMENT avec la note remise en forme, sans phrase d'introduction ni bloc de code.`;
 
 export const CAMERA_PROMPTS: Record<string, string> = {
-  explain: "Explique ce que tu vois sur cette image, simplement et précisément. Si c'est un objet ou un appareil, dis ce que c'est, à quoi ça sert et comment on l'utilise.",
-  read: "Recopie fidèlement le texte visible sur l'image, puis résume-le en une phrase.",
-  translate: "Traduis en français le texte visible sur l'image. Donne d'abord la traduction, puis la langue d'origine.",
+  explain: "Qu'est-ce que c'est et à quoi ça sert ? Réponds en 2 ou 3 phrases, sans décrire l'image.",
+  read: "Recopie fidèlement le texte visible sur l'image. Rien d'autre.",
+  translate: "Traduis en français le texte visible sur l'image. Donne seulement la traduction.",
 };

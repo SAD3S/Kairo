@@ -61,8 +61,10 @@ export function Camera() {
   useEffect(() => () => abort.current?.abort(), []);
 
   const prompt = () => {
-    const base = CAMERA_PROMPTS[mode];
-    return question.trim() ? `${base}\n\nQuestion : ${question.trim()}` : base;
+    const q = question.trim();
+    // Une question précise passe avant le mode : on répond juste à elle.
+    if (q) return mode === 'explain' ? `${q}\n\n(Réponds seulement à cette question, en t'appuyant sur l'image, sans la décrire.)` : `${CAMERA_PROMPTS[mode]}\n\nPuis réponds brièvement à : ${q}`;
+    return CAMERA_PROMPTS[mode];
   };
 
   const analyse = async (img: string) => {
