@@ -44,6 +44,13 @@ async function run(id: number, algo: Algo, a: LatLon, b: LatLon, durationMs: num
   const estimate = skip ? 0 : estimateVisits(g, a, b, algo);
   const batch = skip ? 1e9 : Math.max(1, Math.ceil(estimate / frames));
   const it = shortestPath(g, sa.node, sb.node, algo, batch);
+  // Au-delà de ~60 000 routes explorées, on n'en dessine qu'une partie (segments droits) :
+  // l'effet visuel est le même et le téléphone reste fluide.
+  const MAX_DRAWN = 60000;
+  const keepEvery = Math.max(1, Math.ceil((estimate * 2.2) / MAX_DRAWN));
+  let counter = 0;
+  const lineOf = (e: number): [number, number][] =>
+    keepEvery > 1 ? [[g.lon[g.from[e]], g.lat[g.from[e]]], [g.lon[g.to[e]], g.lat[g.to[e]]]] : edgeCoords(g, e);
   let last = performance.now();
   for (;;) {
     const r = it.next();
@@ -56,7 +63,9 @@ async function run(id: number, algo: Algo, a: LatLon, b: LatLon, durationMs: num
     }
     if (id !== runId) return; // une nouvelle demande a remplacé celle-ci
     if (!skip) {
-      post({ type: 'explored', id, lines: r.value.map((e) => edgeCoords(g, e)) });
+      const lines: [number, number][][] = [];
+      for (const e of r.value) if (counter++ % keepEvery === 0) lines.push(lineOf(e));
+      post({ type: 'explored', id, lines });
       // Une image toutes les ~33 ms ; on rend la main pour recevoir « passer ».
       await sleep(Math.max(0, FRAME - (performance.now() - last)));
       last = performance.now();
