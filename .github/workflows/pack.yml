@@ -1,0 +1,96 @@
+# Fabrique le pack hors ligne Île-de-France (routes + adresses + carte) et le publie
+# dans la release « pack-idf ». Relancé chaque mois pour suivre OpenStreetMap.
+name: Pack Île-de-France
+
+on:
+  push:
+    branches: [main]
+    paths: ['tools/pack/**', '.github/workflows/pack.yml']
+  schedule:
+    - cron: '17 3 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pack-idf
+  cancel-in-progress: true
+
+env:
+  BBOX: '1.44,48.12,3.56,49.24'
+  UA: 'Kairo/1.0 (pack hors ligne; https://github.com/SAD3S/Kairo)'
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Outils
+        run: |
+          pip install osmium numpy scipy
+          gh release download -R protomaps/go-pmtiles --pattern '*Linux_x86_64.tar.gz' -O pmtiles.tgz
+          tar xzf pmtiles.tgz pmtiles && ./pmtiles version
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Extrait OpenStreetMap (Geofabrik)
+        run: |
+          curl -fL --retry 3 -A "$UA" -o idf.osm.pbf https://download.geofabrik.de/europe/france/ile-de-france-latest.osm.pbf
+          ls -lh idf.osm.pbf
+
+      - name: Routes et adresses
+        run: python3 tools/pack/build_pack.py idf.osm.pbf out
+
+      - name: Carte (Protomaps)
+        run: |
+          BUILD=""
+          for i in $(seq 0 12); do
+            D=$(date -u -d "-$i day" +%Y%m%d)
+            if curl -sfI "https://build.protomaps.com/$D.pmtiles" > /dev/null; then BUILD=$D; break; fi
+          done
+          test -n "$BUILD" || { echo "Aucune carte Protomaps récente"; exit 1; }
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
+          ./pmtiles extract "https://build.protomaps.com/$BUILD.pmtiles" out/tiles.pmtiles --bbox="$BBOX" --maxzoom=15 --download-threads=8
+          SIZE=$(stat -c %s out/tiles.pmtiles)
+          # Au-delà de 1,2 Go, on s'arrête au zoom 14 (la carte reste nette par agrandissement).
+          if [ "$SIZE" -gt 1200000000 ]; then
+            rm out/tiles.pmtiles
+            ./pmtiles extract "https://build.protomaps.com/$BUILD.pmtiles" out/tiles.pmtiles --bbox="$BBOX" --maxzoom=14 --download-threads=8
+          fi
+          ls -lh out
+
+      - name: Manifeste
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, datetime
+          files = {}
+          for key, name in (('graph', 'graph.bin.gz'), ('places', 'places.json.gz'), ('tiles', 'tiles.pmtiles')):
+              p = os.path.join('out', name)
+              h = hashlib.sha256()
+              with open(p, 'rb') as f:
+                  for chunk in iter(lambda: f.read(1 << 20), b''):
+                      h.update(chunk)
+              files[key] = {'name': name, 'size': os.path.getsize(p), 'sha256': h.hexdigest()}
+          manifest = {
+              'id': 'idf', 'name': 'Île-de-France', 'version': datetime.date.today().isoformat(),
+              'bbox': [float(x) for x in os.environ['BBOX'].split(',')], 'mapBuild': os.environ['BUILD'], 'files': files,
+          }
+          json.dump(manifest, open('out/manifest.json', 'w'), ensure_ascii=False, indent=1)
+          print(json.dumps(manifest, ensure_ascii=False, indent=1))
+          PY
+
+      - name: Publier
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete pack-idf -y --cleanup-tag || true
+          gh release create pack-idf out/manifest.json out/graph.bin.gz out/places.json.gz out/tiles.pmtiles \
+            --title "Pack hors ligne Île-de-France ($(date -u +%F))" --latest=false \
+            --notes "Données © contributeurs OpenStreetMap (ODbL). Carte : Protomaps ($BUILD). Téléchargé automatiquement par l'app Kairo (Réglages → Cartes hors ligne)."
