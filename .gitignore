@@ -1,0 +1,5 @@
+node_modules
+dist
+public/genai-wasm
+android/app/build
+.DS_Store
