@@ -16,19 +16,20 @@ adb shell am start -W -n app.kairo.mobile/.MainActivity   # à chaud
 
 ## Partie 0 — état de départ (v1.0.13)
 
-### Mesuré sur le téléphone — À REMPLIR
-
-Ces valeurs ne peuvent être prises que sur l'appareil ; elles n'ont pas encore été relevées.
+### Mesuré sur le téléphone (relevé du 16/11/2026, v1.0.13)
 
 | Mesure | Avant | Après |
 |---|---|---|
-| Démarrage à froid (`am start -W`, TotalTime) | à relever | |
-| Démarrage à chaud (`am start -W`) | à relever | |
-| Démarrage : premier écran affiché (Réglages → Performances) | à relever | |
-| Carte utilisable | à relever | |
-| Routes ~5 km en ville : téléchargement Overpass | à relever | |
-| Routes ~5 km en ville : construction du graphe | à relever | |
-| IA : premier mot affiché | à relever | |
+| Démarrage à froid / à chaud (`am start -W`) | non relevé (nécessite adb) | |
+| Démarrage : premier écran affiché | 1 041 ms | |
+| Carte utilisable (carte hors ligne) | 1 318 ms | |
+| Routes : chargement du pack hors ligne (461 571 nœuds) | **17 246 ms** | |
+| Routes ~5 km en ville via Overpass (téléchargement + graphe) | non relevé (pack utilisé) | |
+| IA : premier mot affiché (IA sur le téléphone) | 2 943 ms | |
+| IA : réponse complète (437 caractères) | 12 804 ms | |
+
+Point noir : le chargement du pack (17 s). Sur ordinateur le décodage prend 0,3 s : le temps part dans
+la lecture du fichier par blocs de 4 Mo convertis en base64 à travers le pont natif. À traiter en priorité en partie 7.
 
 ### Mesuré hors téléphone (ordinateur de build, Chrome sans interface)
 

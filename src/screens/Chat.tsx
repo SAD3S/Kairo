@@ -139,7 +139,7 @@ export function Chat({ noteId, prefill }: { noteId?: string; prefill?: string })
         {showPill && <StatusPill status={session.status} sub={session.sub} />}
       </div>
 
-      <div style={{ position: 'absolute', left: 12, right: 12, bottom: 'calc(var(--bottom) + 72px)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="chat-input" style={{ position: 'absolute', left: 12, right: 12, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 11 }}>
         {(note || image || dictErr) && (
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {note && <span className="tag accent">CONTEXTE · {(note.title || 'Sans titre').toUpperCase().slice(0, 28)}</span>}

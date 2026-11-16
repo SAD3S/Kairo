@@ -11,8 +11,11 @@
   --a: #8b8cf8;
   --a-soft: #b9bafb;
   --danger: #f2877a;
-  --top: max(env(safe-area-inset-top), 28px);
-  --bottom: max(env(safe-area-inset-bottom), 12px);
+  /* Insets système : injectés par Capacitor (edge-to-edge), sinon env() du navigateur. */
+  --top: max(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)), 24px);
+  --bottom: max(var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)), 12px);
+  --left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   --sans: 'Inter Variable', Inter, system-ui, sans-serif;
   color-scheme: dark;
@@ -30,7 +33,12 @@ a { color: var(--a-soft); }
 :focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
 
 /* ---------- Coque de l'app ---------- */
-.app { height: 100%; max-width: 560px; margin: 0 auto; position: relative; overflow: hidden; background: var(--bg); }
+.app { height: 100%; max-width: 560px; margin: 0 auto; position: relative; overflow: hidden; background: var(--bg); padding-left: var(--left); padding-right: var(--right); }
+/* Clavier ouvert (un champ a le focus) : la barre du bas s'efface pour laisser la place. */
+body.typing .nav { opacity: 0; pointer-events: none; transform: translate(-50%, 20px); }
+.nav { transition: opacity .15s, transform .15s; }
+.chat-input { bottom: calc(var(--bottom) + 72px); transition: bottom .15s; }
+body.typing .chat-input { bottom: calc(var(--bottom) + 10px); }
 @media (min-width: 700px) { .app { border-left: 1px solid #16161a; border-right: 1px solid #16161a; } }
 .screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .page { flex: 1; padding: calc(var(--top) + 18px) 16px 120px; display: flex; flex-direction: column; gap: 14px; }
@@ -209,12 +217,12 @@ textarea.input { height: auto; padding: 12px 14px; resize: none; line-height: 1.
 .sw.on { border-color: var(--text); }
 
 /* ---------- Itinéraire ---------- */
-.route-top { position: absolute; top: calc(var(--top) + 6px); left: 10px; right: 10px; z-index: 6; padding: 4px 6px 4px 12px; border-radius: 20px; }
+.route-top { position: absolute; top: calc(var(--top) + 6px); left: 10px; right: 10px; z-index: 15; padding: 4px 6px 4px 12px; border-radius: 20px; }
 .route-input { flex: 1; min-width: 0; height: 44px; border: none; background: transparent; outline: none; color: var(--text); font-size: 15.5px; }
 .pin-dot { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-content: center; font: 700 11px var(--sans); color: var(--bg); }
 .pin-dot-A { background: #7BD88F; }
 .pin-dot-B { background: var(--a); }
-.suggest { position: absolute; left: -12px; right: -6px; top: calc(100% + 6px); z-index: 20; border-radius: 18px; padding: 6px; display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; background: rgba(20,20,22,0.97); }
+.suggest { position: absolute; left: -12px; right: -6px; top: calc(100% + 6px); z-index: 20; border-radius: 18px; padding: 6px; display: flex; flex-direction: column; max-height: max(150px, calc(100dvh - var(--top) - 190px)); overscroll-behavior: contain; overflow-y: auto; background: rgba(20,20,22,0.97); }
 .suggest-item { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: 12px; border: none; background: transparent; min-height: 48px; }
 .suggest-item:hover, .suggest-item:focus-visible { background: var(--surface-2); }
 .suggest-msg { padding: 12px; font-size: 14px; color: var(--muted); }
@@ -227,3 +235,7 @@ textarea.input { height: auto; padding: 12px 14px; resize: none; line-height: 1.
 .nav-banner { position: absolute; top: calc(var(--top) + 6px); left: 10px; right: 10px; z-index: 6; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 22px; background: #8B8CF8; color: #0A0A0B; box-shadow: 0 6px 24px rgba(0,0,0,.35); min-height: 74px; }
 .nav-toast { position: absolute; top: calc(var(--top) + 96px); left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 14px; font-size: 13px; white-space: nowrap; }
 .maplibregl-ctrl-attrib { font-size: 10px; }
+
+/* Recherche d'adresse en cours : rien ne doit gêner les suggestions. */
+.route-searching .route-panel, .route-searching .nav { opacity: 0; pointer-events: none; }
+.route-panel { transition: opacity .15s; }

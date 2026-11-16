@@ -283,7 +283,7 @@ function RouteScreenInner({ pack }: { pack: Manifest | null }) {
   const navRemainingTime = nav && plan ? plan.time * (nav.remaining / Math.max(1, plan.distance)) : 0;
 
   return (
-    <div className="screen" style={{ background: '#e9e5dc' }}>
+    <div className={`screen${focus ? ' route-searching' : ''}`} style={{ background: mapStyle === MAP_STYLE ? '#e9e5dc' : '#1c1c20' }}>
       <div ref={mapBox} style={{ position: 'absolute', inset: 0 }} />
 
       {phase !== 'nav' ? (

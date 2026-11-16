@@ -28,6 +28,16 @@ export function App() {
   const back = useCallback(() => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s)), []);
   const nav: Nav = useMemo(() => ({ route, go, tab, back }), [route, go, tab, back]);
 
+  // Marque le document quand un champ de saisie a le focus (clavier ouvert).
+  useEffect(() => {
+    const isField = (el: EventTarget | null) => el instanceof HTMLElement && (el.matches('input:not([type=range]):not([type=checkbox]):not([type=file]), textarea') || el.isContentEditable);
+    const on = (e: FocusEvent) => { if (isField(e.target)) document.body.classList.add('typing'); };
+    const off = () => setTimeout(() => { if (!isField(document.activeElement)) document.body.classList.remove('typing'); }, 50);
+    document.addEventListener('focusin', on);
+    document.addEventListener('focusout', off);
+    return () => { document.removeEventListener('focusin', on); document.removeEventListener('focusout', off); };
+  }, []);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
